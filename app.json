@@ -6,18 +6,39 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "roomlenspro",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.roomlenspro.app"
+      "supportsTablet": false,
+      "bundleIdentifier": "com.roomlenspro.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "RoomLensPro uses the camera to capture room photos for documentation.",
+        "NSPhotoLibraryUsageDescription": "RoomLensPro accesses your photo library to import 360° photos.",
+        "NSLocationWhenInUseUsageDescription": "RoomLensPro uses your location to tag job site addresses automatically.",
+        "NSLocalNetworkUsageDescription": "RoomLensPro needs local network access to connect to your 360° camera via WiFi.",
+        "NSBonjourServices": ["_http._tcp"]
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#0a1628"
       },
-      "package": "com.roomlenspro.app"
+      "package": "com.roomlenspro.app",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_WIFI_STATE",
+        "CHANGE_WIFI_STATE",
+        "INTERNET",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "BLUETOOTH",
+        "BLUETOOTH_ADMIN",
+        "BLUETOOTH_CONNECT",
+        "BLUETOOTH_SCAN"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -33,6 +54,18 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#0a1628"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "RoomLensPro uses your location to auto-fill job site addresses."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "RoomLensPro accesses photos to import 360° images from your camera roll."
         }
       ]
     ],
