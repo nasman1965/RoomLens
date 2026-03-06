@@ -53,7 +53,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { user, signOut } = useAuthStore();
 
-  const tier = user?.subscription_tier ?? 'free';
+  const tier = (user?.subscription_tier ?? 'free') as keyof typeof SUBSCRIPTION_TIERS;
   const tierInfo = SUBSCRIPTION_TIERS[tier];
 
   const handleSignOut = () => {

@@ -59,12 +59,11 @@ export default function NewJobScreen() {
 
     setLoading(true);
     const { job, error } = await jobsService.createJob({
-      userId: user.id,
-      address: address.trim(),
-      jobType,
-      notes: notes.trim() || undefined,
-      gpsLat: gps?.lat,
-      gpsLng: gps?.lng,
+      property_address: address.trim(),
+      job_type:         jobType,
+      notes:            notes.trim() || undefined,
+      gps_lat:          gps?.lat,
+      gps_lng:          gps?.lng,
     });
     setLoading(false);
 

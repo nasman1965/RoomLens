@@ -5,33 +5,17 @@ import { authService } from '../src/services/auth';
 import { useAuthStore } from '../src/store';
 
 export default function RootLayout() {
-  const { setUser, setSession, setLoading } = useAuthStore();
+  const { setUser, setLoading } = useAuthStore();
 
   useEffect(() => {
-    // Initialise auth state on app launch
-    const checkSession = async () => {
-      try {
-        const session = await authService.getSession();
-        if (session) {
-          const user = await authService.getCurrentUser();
-          if (user) {
-            setUser(user);
-            setSession(session);
-          }
-        }
-      } catch (_) {}
+    // Subscribe to Firebase auth state — fires immediately on app start
+    // with the persisted session (if any) thanks to AsyncStorage persistence.
+    const unsubscribe = authService.onAuthStateChange((user) => {
+      setUser(user);
       setLoading(false);
-    };
-    checkSession();
+    });
 
-    // Listen for auth changes
-    const { data: { subscription } } = authService.onAuthStateChange(
-      async (event, session) => {
-        setSession(session);
-        if (event === 'SIGNED_OUT') setUser(null);
-      }
-    );
-    return () => subscription.unsubscribe();
+    return () => unsubscribe();
   }, []);
 
   return (

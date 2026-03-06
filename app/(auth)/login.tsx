@@ -14,7 +14,7 @@ import { Colors, FontSize, Spacing, Radius, Shadow } from '../../src/constants/t
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { setUser, setSession } = useAuthStore();
+  const { setUser } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
@@ -38,8 +38,6 @@ export default function LoginScreen() {
     if (error) { setErrors({ general: error }); return; }
     if (user) {
       setUser(user);
-      const session = await authService.getSession();
-      setSession(session);
       router.replace('/(tabs)');
     }
   };

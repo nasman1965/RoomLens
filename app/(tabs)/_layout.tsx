@@ -18,28 +18,61 @@ export default function TabsLayout() {
           height: 60,
         },
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: '600',
           marginTop: 2,
         },
       }}
     >
+      {/* Tab 1 — Home / Dashboard */}
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Dashboard',
+          title: 'Home',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="grid-outline" size={size} color={color} />
+            <Ionicons name="home-outline" size={size} color={color} />
           ),
         }}
       />
+
+      {/* Tab 2 — Floor Plan (360° capture module) */}
+      <Tabs.Screen
+        name="floor-plan"
+        options={{
+          title: 'Floor Plan',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="scan-outline" size={size} color={color} />
+          ),
+        }}
+      />
+
+      {/* Tab 3 — Moisture Map */}
+      <Tabs.Screen
+        name="moisture-map"
+        options={{
+          title: 'Moisture',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="water-outline" size={size} color={color} />
+          ),
+        }}
+      />
+
+      {/* Tab 4 — Large Loss rapid photo mode */}
+      <Tabs.Screen
+        name="large-loss"
+        options={{
+          title: 'Large Loss',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="business-outline" size={size} color={color} />
+          ),
+        }}
+      />
+
+      {/* Hidden tabs — accessible via deep-link / job dashboard tiles only */}
       <Tabs.Screen
         name="jobs"
         options={{
-          title: 'Jobs',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="briefcase-outline" size={size} color={color} />
-          ),
+          href: null,   // hides from tab bar, keeps route accessible
         }}
       />
     </Tabs>

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, Image, StyleSheet, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, StatusBar } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Colors, FontSize, Spacing } from '../../src/constants/theme';
@@ -8,25 +8,22 @@ import { useAuthStore } from '../../src/store';
 
 export default function SplashScreen() {
   const router = useRouter();
-  const { setUser, setSession, setLoading } = useAuthStore();
+  const { setUser, setLoading } = useAuthStore();
 
   useEffect(() => {
+    // Check for a persisted Firebase session (AsyncStorage backed)
     const checkAuth = async () => {
       try {
-        const session = await authService.getSession();
-        if (session) {
-          const user = await authService.getCurrentUser();
-          if (user) {
-            setUser(user);
-            setSession(session);
-            setLoading(false);
-            router.replace('/(tabs)');
-            return;
-          }
+        const user = await authService.getCurrentUser();
+        if (user) {
+          setUser(user);
+          setLoading(false);
+          router.replace('/(tabs)');
+          return;
         }
       } catch {}
       setLoading(false);
-      // Small delay for splash visual
+      // Small delay for the splash visual
       setTimeout(() => router.replace('/(auth)/login'), 1800);
     };
     checkAuth();
@@ -49,7 +46,7 @@ export default function SplashScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  content:   { flex: 1, justifyContent: 'center', alignItems: 'center' },
   logoBox: {
     width: 100, height: 100, borderRadius: 28,
     backgroundColor: 'rgba(255,255,255,0.15)',

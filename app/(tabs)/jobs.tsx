@@ -45,7 +45,7 @@ export default function JobsScreen() {
   const loadJobs = useCallback(async () => {
     if (!user?.id) return;
     setLoading(true);
-    const { jobs: fetched } = await jobsService.getJobs(user.id, 100);
+    const { jobs: fetched } = await jobsService.getJobs();
     if (fetched) setJobs(fetched);
     setLoading(false);
   }, [user?.id]);

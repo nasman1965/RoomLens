@@ -80,7 +80,7 @@ export default function DashboardScreen() {
   const loadJobs = useCallback(async () => {
     if (!user?.id) return;
     setLoading(true);
-    const { jobs: fetched } = await jobsService.getJobs(user.id, 50);
+    const { jobs: fetched } = await jobsService.getJobs();
     if (fetched) setJobs(fetched);
     setLoading(false);
   }, [user?.id]);

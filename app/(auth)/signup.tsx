@@ -14,7 +14,7 @@ import { Colors, FontSize, Spacing, Radius, Shadow } from '../../src/constants/t
 
 export default function SignupScreen() {
   const router = useRouter();
-  const { setUser, setSession } = useAuthStore();
+  const { setUser } = useAuthStore();
 
   const [companyName, setCompanyName] = useState('');
   const [email, setEmail] = useState('');
@@ -52,8 +52,6 @@ export default function SignupScreen() {
     if (error) { setErrors({ general: error }); return; }
     if (user) {
       setUser(user);
-      const session = await authService.getSession();
-      setSession(session);
       router.replace('/(tabs)');
     }
   };

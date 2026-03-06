@@ -23,7 +23,7 @@ export default function ForgotPasswordScreen() {
     if (!/\S+@\S+\.\S+/.test(email)) { setErrors({ email: 'Enter a valid email' }); return; }
 
     setLoading(true);
-    const { error } = await authService.sendPasswordReset(email.trim().toLowerCase());
+    const { error } = await authService.resetPassword(email.trim().toLowerCase());
     setLoading(false);
 
     if (error) { setErrors({ general: error }); return; }
