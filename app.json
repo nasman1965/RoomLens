@@ -1,21 +1,23 @@
 {
   "expo": {
-    "name": "mobile_Measuring_app",
-    "slug": "mobile_Measuring_app",
+    "name": "RoomLensPro",
+    "slug": "roomlenspro",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "myapp",
+    "scheme": "roomlenspro",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.roomlenspro.app"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      }
+        "backgroundColor": "#0a1628"
+      },
+      "package": "com.roomlenspro.app"
     },
     "web": {
       "bundler": "metro",
@@ -30,7 +32,7 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#0a1628"
         }
       ]
     ],

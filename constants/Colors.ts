@@ -1,26 +1,42 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * RoomLensPro Brand Color Palette
+ * Primary: Deep Navy (#0a1628) — professional, trustworthy
+ * Accent:  Vivid Red (#e63946)  — energetic, action-oriented
+ * Gold:    (#f4a261)            — premium, warmth
+ * Light background: (#f8f9fc)
  */
-
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
 
 export const Colors = {
   light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
+    text: '#0a1628',
+    textSecondary: '#64748b',
+    background: '#f8f9fc',
+    card: '#ffffff',
+    tint: '#e63946',
+    accent: '#f4a261',
+    navy: '#0a1628',
+    border: '#e2e8f0',
+    icon: '#64748b',
+    tabIconDefault: '#94a3b8',
+    tabIconSelected: '#e63946',
+    inputBg: '#ffffff',
+    success: '#22c55e',
+    error: '#e63946',
   },
   dark: {
-    text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
+    text: '#f1f5f9',
+    textSecondary: '#94a3b8',
+    background: '#0a1628',
+    card: '#1e2d45',
+    tint: '#e63946',
+    accent: '#f4a261',
+    navy: '#0a1628',
+    border: '#1e2d45',
+    icon: '#94a3b8',
+    tabIconDefault: '#475569',
+    tabIconSelected: '#e63946',
+    inputBg: '#1e2d45',
+    success: '#22c55e',
+    error: '#e63946',
   },
 };
