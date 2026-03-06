@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --navy: #0a1628;
+  --navy-light: #1e3a5f;
+  --red: #e63946;
+  --gold: #f4a261;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.sidebar-link {
+  @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150;
+}
+
+.sidebar-link:hover {
+  @apply bg-white/10 text-white;
+}
+
+.sidebar-link.active {
+  @apply bg-white/15 text-white;
+}
+
+.btn-primary {
+  @apply inline-flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm font-semibold transition-all;
+  background: var(--navy);
+}
+
+.btn-primary:hover {
+  background: var(--navy-light);
+}
+
+.card {
+  @apply bg-white rounded-2xl border border-gray-100 shadow-sm;
+}
+
+.badge {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #f1f5f9; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
