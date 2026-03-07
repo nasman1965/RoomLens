@@ -1,155 +1,266 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+import { ArrowLeft, Save, Loader2, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
-import { onAuthStateChanged } from 'firebase/auth';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
-import { JobType, JOB_TYPE_LABELS, JOB_TYPE_ICONS } from '@/types';
-import { MapPin, FileText, Loader2, ChevronLeft, Locate } from 'lucide-react';
 
-const JOB_TYPES: JobType[] = ['water_loss', 'fire_loss', 'mold', 'large_loss', 'other'];
+const WORKFLOW_STEPS = [
+  'File Creation',
+  'Dispatch',
+  'Work Authorization',
+  'Day-1 Evidence',
+  'Content Inventory',
+  'Equipment Placement',
+  '24-Hr Report',
+  'Floor Plan Scan',
+  'Moisture Map Setup',
+  'Daily Drying Logs',
+  'Drying Goal Met',
+  'Equipment Removal',
+  'Final Scope / Est.',
+  'Job Close Checklist',
+  'Invoicing & Close',
+];
 
 export default function NewJobPage() {
   const router = useRouter();
-  const [uid, setUid] = useState('');
-  const [address, setAddress] = useState('');
-  const [jobType, setJobType] = useState<JobType>('water_loss');
-  const [notes, setNotes] = useState('');
-  const [gpsLat, setGpsLat] = useState('');
-  const [gpsLng, setGpsLng] = useState('');
-  const [locating, setLocating] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState({
+    insured_name: '',
+    insured_phone: '',
+    insured_email: '',
+    property_address: '',
+    property_city: '',
+    property_postal_code: '',
+    claim_number: '',
+    insurer_name: '',
+    loss_date: '',
+    loss_category: '2',
+    loss_class: '2',
+    job_type: 'water_loss',
+    adjuster_name: '',
+    adjuster_email: '',
+    adjuster_phone: '',
+    notes: '',
+  });
 
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, u => {
-      if (!u) { router.push('/login'); return; }
-      setUid(u.uid);
-    });
-    return unsub;
-  }, [router]);
-
-  const handleLocate = () => {
-    if (!navigator.geolocation) { setError('Geolocation not supported.'); return; }
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        setGpsLat(pos.coords.latitude.toFixed(6));
-        setGpsLng(pos.coords.longitude.toFixed(6));
-        setLocating(false);
-      },
-      () => { setError('Could not get location.'); setLocating(false); }
-    );
-  };
+  const update = (k: string, v: string) => setForm(prev => ({ ...prev, [k]: v }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!address.trim()) { setError('Property address is required.'); return; }
+    if (!form.insured_name || !form.property_address) {
+      setError('Insured name and property address are required.');
+      return;
+    }
+
     setLoading(true); setError('');
+
     try {
-      const ref = await addDoc(collection(db, 'jobs'), {
-        user_id: uid,
-        property_address: address.trim(),
-        job_type: jobType,
-        status: 'draft',
-        notes: notes.trim() || null,
-        gps_lat: gpsLat ? parseFloat(gpsLat) : null,
-        gps_lng: gpsLng ? parseFloat(gpsLng) : null,
-        created_at: serverTimestamp(),
-      });
-      router.push(`/jobs/${ref.id}`);
-    } catch {
-      setError('Failed to create job. Check Firebase configuration.');
-    } finally { setLoading(false); }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { router.push('/login'); return; }
+
+      // 1. Create the job
+      const { data: job, error: jobError } = await supabase
+        .from('jobs')
+        .insert({
+          user_id: session.user.id,
+          insured_name: form.insured_name,
+          insured_phone: form.insured_phone || null,
+          insured_email: form.insured_email || null,
+          property_address: form.property_address,
+          property_city: form.property_city || null,
+          property_postal_code: form.property_postal_code || null,
+          claim_number: form.claim_number || null,
+          insurer_name: form.insurer_name || null,
+          loss_date: form.loss_date || null,
+          loss_category: parseInt(form.loss_category),
+          loss_class: parseInt(form.loss_class),
+          job_type: form.job_type,
+          adjuster_name: form.adjuster_name || null,
+          adjuster_email: form.adjuster_email || null,
+          adjuster_phone: form.adjuster_phone || null,
+          notes: form.notes || null,
+          status: 'new',
+          current_step: 1,
+        })
+        .select('id')
+        .single();
+
+      if (jobError || !job) {
+        setError(jobError?.message || 'Failed to create job.');
+        return;
+      }
+
+      // 2. Auto-insert all 15 workflow steps
+      const workflowSteps = WORKFLOW_STEPS.map((name, i) => ({
+        job_id: job.id,
+        step_number: i + 1,
+        step_name: name,
+        status: i === 0 ? 'complete' : i === 1 ? 'in_progress' : 'pending',
+        completed_at: i === 0 ? new Date().toISOString() : null,
+        completed_by: i === 0 ? session.user.id : null,
+      }));
+
+      const { error: stepsError } = await supabase
+        .from('workflow_steps')
+        .insert(workflowSteps);
+
+      if (stepsError) {
+        console.error('Workflow steps error:', stepsError);
+        // Non-fatal — job was created, workflow steps failed
+      }
+
+      // 3. Redirect to job detail
+      router.push(`/jobs/${job.id}`);
+    } catch (err) {
+      setError('Unexpected error. Please try again.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  return (
-    <div className="max-w-2xl mx-auto px-6 py-8">
-      <Link href="/jobs" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-6">
-        <ChevronLeft size={16} /> Back to Jobs
-      </Link>
+  const Field = ({ label, name, type = 'text', required = false, placeholder = '' }: {
+    label: string; name: string; type?: string; required?: boolean; placeholder?: string
+  }) => (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+      </label>
+      <input
+        type={type}
+        value={form[name as keyof typeof form]}
+        onChange={e => update(name, e.target.value)}
+        placeholder={placeholder}
+        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+        required={required}
+      />
+    </div>
+  );
 
-      <h1 className="text-2xl font-extrabold text-gray-900 mb-1">New Job</h1>
-      <p className="text-gray-500 text-sm mb-8">Create a restoration job to start documenting</p>
+  return (
+    <div className="p-6 max-w-3xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-6">
+        <Link href="/jobs" className="p-2 hover:bg-gray-100 rounded-lg transition">
+          <ArrowLeft className="w-5 h-5 text-gray-600" />
+        </Link>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">New Job</h1>
+          <p className="text-sm text-gray-500">Create a new restoration job file</p>
+        </div>
+      </div>
 
       {error && (
-        <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm mb-4">{error}</div>
+        <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-3 mb-5">
+          <AlertCircle className="w-4 h-4 shrink-0" />{error}
+        </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Address */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
-            Property Address <span className="text-red-500">*</span>
-          </label>
-          <div className="relative">
-            <MapPin size={16} className="absolute left-3 top-3 text-gray-400" />
-            <input
-              type="text" value={address} onChange={e => setAddress(e.target.value)}
-              placeholder="123 Main St, Calgary, AB"
-              className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+        {/* Insured Information */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h2 className="text-base font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-100">
+            Insured Information
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Insured Name" name="insured_name" required placeholder="John Smith" />
+            <Field label="Phone" name="insured_phone" type="tel" placeholder="(604) 555-0100" />
+            <Field label="Email" name="insured_email" type="email" placeholder="john@email.com" />
           </div>
         </div>
 
-        {/* GPS */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">GPS Coordinates (optional)</label>
-          <div className="flex gap-3">
-            <input
-              type="number" step="any" value={gpsLat} onChange={e => setGpsLat(e.target.value)}
-              placeholder="Latitude"
-              className="flex-1 px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <input
-              type="number" step="any" value={gpsLng} onChange={e => setGpsLng(e.target.value)}
-              placeholder="Longitude"
-              className="flex-1 px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <button type="button" onClick={handleLocate} disabled={locating}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 bg-white text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50">
-              {locating ? <Loader2 size={14} className="animate-spin" /> : <Locate size={14} />}
-              {locating ? '' : 'Auto'}
-            </button>
+        {/* Property */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h2 className="text-base font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-100">
+            Property Details
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="sm:col-span-2">
+              <Field label="Street Address" name="property_address" required placeholder="123 Main St" />
+            </div>
+            <Field label="City" name="property_city" placeholder="Vancouver" />
+            <Field label="Postal Code" name="property_postal_code" placeholder="V6B 2W9" />
           </div>
         </div>
 
-        {/* Job type */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Job Type</label>
-          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-            {JOB_TYPES.map(t => (
-              <button key={t} type="button" onClick={() => setJobType(t)}
-                className={`flex flex-col items-center gap-1.5 px-2 py-3 rounded-xl border-2 text-xs font-medium transition-all ${jobType === t ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}>
-                <span className="text-xl">{JOB_TYPE_ICONS[t]}</span>
-                {JOB_TYPE_LABELS[t]}
-              </button>
-            ))}
+        {/* Claim Details */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h2 className="text-base font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-100">
+            Claim Details
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Claim Number" name="claim_number" placeholder="CLM-2024-001" />
+            <Field label="Insurer" name="insurer_name" placeholder="Intact Insurance" />
+            <Field label="Loss Date" name="loss_date" type="date" />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Job Type</label>
+              <select value={form.job_type} onChange={e => update('job_type', e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                <option value="water_loss">💧 Water Loss</option>
+                <option value="fire_loss">🔥 Fire Loss</option>
+                <option value="mold">🌿 Mold</option>
+                <option value="large_loss">🏗️ Large Loss</option>
+                <option value="other">📋 Other</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Loss Category</label>
+              <select value={form.loss_category} onChange={e => update('loss_category', e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                <option value="1">Category 1 – Clean Water</option>
+                <option value="2">Category 2 – Grey Water</option>
+                <option value="3">Category 3 – Black Water</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Loss Class</label>
+              <select value={form.loss_class} onChange={e => update('loss_class', e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                <option value="1">Class 1 – Least Affected</option>
+                <option value="2">Class 2 – Significant Absorption</option>
+                <option value="3">Class 3 – Greatest Absorption</option>
+                <option value="4">Class 4 – Specialty Drying</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Adjuster */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h2 className="text-base font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-100">
+            Adjuster Information <span className="text-sm font-normal text-gray-400">(optional)</span>
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Adjuster Name" name="adjuster_name" placeholder="Jane Doe" />
+            <Field label="Adjuster Phone" name="adjuster_phone" type="tel" placeholder="(604) 555-0200" />
+            <div className="sm:col-span-2">
+              <Field label="Adjuster Email" name="adjuster_email" type="email" placeholder="jadj@insurer.com" />
+            </div>
           </div>
         </div>
 
         {/* Notes */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
-            <span className="flex items-center gap-1.5"><FileText size={14} /> Notes (optional)</span>
-          </label>
-          <textarea value={notes} onChange={e => setNotes(e.target.value)}
-            placeholder="Initial observations, site conditions, special instructions…"
-            rows={4}
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+          <textarea
+            value={form.notes} onChange={e => update('notes', e.target.value)}
+            rows={3} placeholder="Initial observations, special instructions..."
+            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
           />
         </div>
 
-        <div className="flex gap-3">
+        {/* Submit */}
+        <div className="flex gap-3 pb-6">
           <Link href="/jobs"
-            className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-700 text-sm font-semibold text-center hover:bg-gray-50 transition-colors">
+            className="flex-1 text-center py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition text-sm">
             Cancel
           </Link>
           <button type="submit" disabled={loading}
-            className="flex-1 py-3 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2 transition-opacity disabled:opacity-60"
-            style={{ background: '#0a1628' }}>
-            {loading ? <><Loader2 size={15} className="animate-spin" /> Creating...</> : 'Create Job'}
+            className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-2.5 rounded-lg transition text-sm">
+            {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating...</> : <><Save className="w-4 h-4" /> Create Job</>}
           </button>
         </div>
       </form>

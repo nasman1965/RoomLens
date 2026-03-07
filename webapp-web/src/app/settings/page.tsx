@@ -1,179 +1,209 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged, updateProfile, updatePassword, User, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
-import { UserProfile, SubscriptionTier } from '@/types';
-import { User as UserIcon, Lock, Crown, Loader2, Check, AlertCircle } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { User, Building2, Mail, Save, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 
-const PLANS: { tier: SubscriptionTier; label: string; price: string; jobs: string; features: string[] }[] = [
-  { tier: 'free', label: 'Free', price: '$0/mo', jobs: '3 jobs/month', features: ['All 4 modules', 'Expo mobile app', '5 GB storage'] },
-  { tier: 'starter', label: 'Starter', price: '$49/mo', jobs: '20 jobs/month', features: ['Everything in Free', 'PDF reports', 'Email support'] },
-  { tier: 'pro', label: 'Pro', price: '$99/mo', jobs: 'Unlimited jobs', features: ['Everything in Starter', 'GPT-4o Vision AI', 'Priority support'] },
-  { tier: 'enterprise', label: 'Enterprise', price: 'Custom', jobs: 'Unlimited + API', features: ['Custom integrations', 'White-label', 'Dedicated CSM'] },
-];
+interface Profile {
+  id: string;
+  email: string;
+  full_name: string | null;
+  company_name: string | null;
+  role: string;
+  subscription_tier: string;
+}
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [fullName, setFullName] = useState('');
   const [companyName, setCompanyName] = useState('');
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [profileMsg, setProfileMsg] = useState('');
-
-  const [currentPass, setCurrentPass] = useState('');
-  const [newPass, setNewPass] = useState('');
-  const [confirmPass, setConfirmPass] = useState('');
-  const [savingPass, setSavingPass] = useState(false);
-  const [passMsg, setPassMsg] = useState('');
-  const [passErr, setPassErr] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async u => {
-      if (!u) { router.push('/login'); return; }
-      setUser(u);
-      setCompanyName(u.displayName || '');
-      try {
-        const snap = await getDoc(doc(db, 'users', u.uid));
-        if (snap.exists()) setProfile(snap.data() as UserProfile);
-      } catch { /* ignore */ }
-    });
-    return unsub;
+    const init = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { router.push('/login'); return; }
+
+      const { data: userRecord } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+
+      if (userRecord) {
+        setProfile(userRecord);
+        setFullName(userRecord.full_name || '');
+        setCompanyName(userRecord.company_name || '');
+      } else {
+        // Profile doesn't exist, use auth data
+        setProfile({
+          id: session.user.id,
+          email: session.user.email!,
+          full_name: session.user.user_metadata?.full_name || '',
+          company_name: session.user.user_metadata?.company_name || '',
+          role: 'admin',
+          subscription_tier: 'free',
+        });
+        setFullName(session.user.user_metadata?.full_name || '');
+        setCompanyName(session.user.user_metadata?.company_name || '');
+      }
+      setLoading(false);
+    };
+    init();
   }, [router]);
 
-  const handleSaveProfile = async (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !companyName.trim()) return;
-    setSavingProfile(true); setProfileMsg('');
-    try {
-      await updateProfile(user, { displayName: companyName });
-      await updateDoc(doc(db, 'users', user.uid), { company_name: companyName });
-      setProfileMsg('Profile saved!');
-      setTimeout(() => setProfileMsg(''), 3000);
-    } catch { setProfileMsg('Save failed.'); }
-    finally { setSavingProfile(false); }
-  };
+    setSaving(true); setError(''); setSuccess(false);
 
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setPassErr(''); setPassMsg('');
-    if (newPass.length < 8) { setPassErr('New password must be at least 8 characters.'); return; }
-    if (newPass !== confirmPass) { setPassErr('Passwords do not match.'); return; }
-    if (!user?.email) return;
-    setSavingPass(true);
     try {
-      const cred = EmailAuthProvider.credential(user.email, currentPass);
-      await reauthenticateWithCredential(user, cred);
-      await updatePassword(user, newPass);
-      setPassMsg('Password changed!');
-      setCurrentPass(''); setNewPass(''); setConfirmPass('');
-      setTimeout(() => setPassMsg(''), 3000);
-    } catch (err: unknown) {
-      const code = (err as { code?: string }).code;
-      if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
-        setPassErr('Current password is incorrect.');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { error: upsertError } = await supabase
+        .from('users')
+        .upsert({
+          id: session.user.id,
+          email: session.user.email!,
+          full_name: fullName,
+          company_name: companyName,
+          role: profile?.role || 'admin',
+          subscription_tier: profile?.subscription_tier || 'free',
+          updated_at: new Date().toISOString(),
+        });
+
+      if (upsertError) {
+        setError(upsertError.message);
       } else {
-        setPassErr('Password change failed. Please try again.');
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3000);
       }
-    } finally { setSavingPass(false); }
+    } catch {
+      setError('Save failed. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const currentTier = profile?.subscription_tier || 'free';
+  const TIER_BADGES: Record<string, string> = {
+    free:       'bg-gray-100 text-gray-600',
+    starter:    'bg-blue-100 text-blue-700',
+    pro:        'bg-purple-100 text-purple-700',
+    enterprise: 'bg-gold-100 text-yellow-700',
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
-      <h1 className="text-2xl font-extrabold text-gray-900">Settings</h1>
-
-      {/* Profile */}
-      <div className="card p-6">
-        <h2 className="text-base font-bold text-gray-900 flex items-center gap-2 mb-4">
-          <UserIcon size={18} /> Profile
-        </h2>
-        <form onSubmit={handleSaveProfile} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Company Name</label>
-            <input type="text" value={companyName} onChange={e => setCompanyName(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
-            <input type="email" value={user?.email || ''} readOnly
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-500 cursor-not-allowed" />
-          </div>
-          {profileMsg && (
-            <div className="flex items-center gap-2 text-green-700 text-sm">
-              <Check size={14} /> {profileMsg}
-            </div>
-          )}
-          <button type="submit" disabled={savingProfile}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-semibold disabled:opacity-60"
-            style={{ background: '#0a1628' }}>
-            {savingProfile ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-            Save Profile
-          </button>
-        </form>
+    <div className="p-6 max-w-2xl mx-auto space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+        <p className="text-gray-500 text-sm mt-0.5">Manage your profile and account</p>
       </div>
 
-      {/* Password */}
-      <div className="card p-6">
-        <h2 className="text-base font-bold text-gray-900 flex items-center gap-2 mb-4">
-          <Lock size={18} /> Change Password
-        </h2>
-        <form onSubmit={handleChangePassword} className="space-y-4">
-          {['Current Password', 'New Password', 'Confirm New Password'].map((label, i) => (
-            <div key={label}>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
-              <input type="password"
-                value={i === 0 ? currentPass : i === 1 ? newPass : confirmPass}
-                onChange={e => i === 0 ? setCurrentPass(e.target.value) : i === 1 ? setNewPass(e.target.value) : setConfirmPass(e.target.value)}
-                placeholder="••••••••"
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      {/* Plan Badge */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-700">Current Plan</p>
+            <div className="flex items-center gap-2 mt-1">
+              <span className={`text-sm font-semibold px-3 py-1 rounded-full capitalize ${TIER_BADGES[profile?.subscription_tier || 'free']}`}>
+                {profile?.subscription_tier || 'free'}
+              </span>
+              <span className="text-xs text-gray-400 capitalize">• {profile?.role} role</span>
             </div>
-          ))}
-          {passErr && <div className="flex items-center gap-2 text-red-600 text-sm"><AlertCircle size={14} />{passErr}</div>}
-          {passMsg && <div className="flex items-center gap-2 text-green-700 text-sm"><Check size={14} />{passMsg}</div>}
-          <button type="submit" disabled={savingPass}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-semibold disabled:opacity-60"
-            style={{ background: '#0a1628' }}>
-            {savingPass ? <Loader2 size={14} className="animate-spin" /> : <Lock size={14} />}
-            Change Password
+          </div>
+          <button className="text-sm text-blue-600 hover:text-blue-800 font-medium">
+            Upgrade Plan →
           </button>
-        </form>
-      </div>
-
-      {/* Plan */}
-      <div className="card p-6">
-        <h2 className="text-base font-bold text-gray-900 flex items-center gap-2 mb-4">
-          <Crown size={18} /> Subscription Plan
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {PLANS.map(plan => (
-            <div key={plan.tier}
-              className={`rounded-xl border-2 p-4 ${currentTier === plan.tier ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-bold text-gray-900">{plan.label}</span>
-                {currentTier === plan.tier && <span className="text-xs font-semibold text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded-full">Current</span>}
-              </div>
-              <p className="text-lg font-extrabold text-gray-900">{plan.price}</p>
-              <p className="text-xs text-gray-500 mb-2">{plan.jobs}</p>
-              <ul className="space-y-1">
-                {plan.features.map(f => (
-                  <li key={f} className="flex items-start gap-1 text-xs text-gray-600">
-                    <Check size={11} className="text-green-500 mt-0.5 flex-shrink-0" /> {f}
-                  </li>
-                ))}
-              </ul>
-              {currentTier !== plan.tier && plan.tier !== 'enterprise' && (
-                <button className="mt-3 w-full py-1.5 rounded-lg text-xs font-semibold text-white"
-                  style={{ background: '#0a1628' }}
-                  onClick={() => alert('Stripe billing coming soon!')}>
-                  Upgrade
-                </button>
-              )}
-            </div>
-          ))}
         </div>
+      </div>
+
+      {/* Profile Form */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <h2 className="text-base font-semibold text-gray-800 mb-4 flex items-center gap-2">
+          <User className="w-4 h-4 text-blue-500" /> Profile Information
+        </h2>
+
+        {error && (
+          <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-3 mb-4">
+            <AlertCircle className="w-4 h-4 shrink-0" />{error}
+          </div>
+        )}
+        {success && (
+          <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg p-3 mb-4">
+            <CheckCircle className="w-4 h-4 shrink-0" /> Profile saved successfully!
+          </div>
+        )}
+
+        <form onSubmit={handleSave} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="email" value={profile?.email || ''} disabled
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-500 cursor-not-allowed"
+              />
+            </div>
+            <p className="text-xs text-gray-400 mt-1">Email cannot be changed here.</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text" value={fullName} onChange={e => setFullName(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                placeholder="John Smith"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+            <div className="relative">
+              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text" value={companyName} onChange={e => setCompanyName(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                placeholder="Smith Restoration Inc."
+              />
+            </div>
+          </div>
+          <button type="submit" disabled={saving}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-2.5 px-5 rounded-lg transition text-sm">
+            {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</> : <><Save className="w-4 h-4" /> Save Changes</>}
+          </button>
+        </form>
+      </div>
+
+      {/* Danger Zone */}
+      <div className="bg-white rounded-xl border border-red-200 p-5">
+        <h2 className="text-base font-semibold text-red-700 mb-3">Danger Zone</h2>
+        <p className="text-sm text-gray-600 mb-3">
+          Deleting your account will permanently remove all jobs and data.
+        </p>
+        <button
+          onClick={async () => {
+            if (confirm('Are you sure? This cannot be undone.')) {
+              await supabase.auth.signOut();
+              router.push('/login');
+            }
+          }}
+          className="text-sm text-red-600 border border-red-300 hover:bg-red-50 px-4 py-2 rounded-lg transition font-medium"
+        >
+          Sign Out
+        </button>
       </div>
     </div>
   );
