@@ -4,18 +4,19 @@ import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import {
   LayoutDashboard, Briefcase, Camera, Map, Droplets,
-  FileText, Settings, LogOut, Building2, ChevronRight, Package,
+  FileText, Settings, LogOut, Building2, ChevronRight, Package, Users,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
-  { href: '/dashboard',   label: 'Dashboard',    icon: LayoutDashboard },
-  { href: '/jobs',        label: 'Jobs',         icon: Briefcase       },
-  { href: '/photos',      label: 'Photos',       icon: Camera          },
-  { href: '/floorplans',  label: 'Floor Plans',  icon: Map             },
-  { href: '/moisture',    label: 'Moisture Map', icon: Droplets        },
-  { href: '/equipment',   label: 'Equipment',    icon: Package         },
-  { href: '/reports',     label: 'Reports',      icon: FileText        },
-  { href: '/settings',    label: 'Settings',     icon: Settings        },
+  { href: '/dashboard',           label: 'Dashboard',    icon: LayoutDashboard },
+  { href: '/jobs',                label: 'Jobs',         icon: Briefcase       },
+  { href: '/photos',              label: 'Photos',       icon: Camera          },
+  { href: '/floorplans',          label: 'Floor Plans',  icon: Map             },
+  { href: '/moisture',            label: 'Moisture Map', icon: Droplets        },
+  { href: '/equipment',           label: 'Equipment',    icon: Package         },
+  { href: '/reports',             label: 'Reports',      icon: FileText        },
+  { href: '/settings?tab=team',   label: 'Employees',    icon: Users           },
+  { href: '/settings',            label: 'Settings',     icon: Settings        },
 ];
 
 export default function Sidebar() {

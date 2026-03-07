@@ -25,6 +25,7 @@ const STATUS_BADGE: Record<string, string> = {
   review:     'bg-yellow-100 text-yellow-700 border-yellow-200',
   closed:     'bg-gray-100 text-gray-500 border-gray-200',
   draft:      'bg-gray-100 text-gray-400 border-gray-200',
+  stopped:    'bg-red-100 text-red-700 border-red-200',
 };
 
 const JOB_TYPE_LABELS: Record<string, string> = {

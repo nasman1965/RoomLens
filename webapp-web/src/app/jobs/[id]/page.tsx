@@ -10,7 +10,8 @@ import {
   Building2, Loader2, AlertCircle, CheckCircle, ChevronRight,
   Clock, Send, MessageSquare, Upload, Eye, PenTool, Download,
   Zap, Radio, Globe, PhoneCall, Star, UserCheck, Navigation,
-  FileCheck, X, Save, Edit3, ExternalLink, Shield, AlertTriangle
+  FileCheck, X, Save, Edit3, ExternalLink, Shield, AlertTriangle,
+  StopCircle, Users, ChevronDown,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -26,14 +27,20 @@ interface Job {
   // Step 1 - File Creation
   lead_source: string | null; lead_source_detail: string | null;
   created_by_name: string | null; created_by_phone: string | null; created_by_email: string | null;
+  created_by_member_id: string | null;
   // Step 2 - Dispatch
   dispatched_to_name: string | null; dispatched_to_phone: string | null;
   dispatched_to_email: string | null; dispatched_at: string | null;
   dispatch_notes: string | null; eta_minutes: number | null;
+  dispatched_member_id: string | null;
   // Step 3 - Work Auth
   work_auth_status: string | null; work_auth_sent_at: string | null;
   work_auth_signed_at: string | null; work_auth_signed_by: string | null;
   work_auth_doc_url: string | null;
+  // Stop Job
+  stopped: boolean; stop_reason: string | null; stop_notes: string | null;
+  stopped_at: string | null; stopped_by: string | null;
+  override_active: boolean; override_reason: string | null; override_by: string | null; override_at: string | null;
 }
 
 interface Document {
@@ -42,11 +49,17 @@ interface Document {
   signed_by: string | null; created_at: string;
 }
 
+interface TeamMember {
+  id: string; full_name: string; role: string;
+  cell_phone: string | null; email: string | null; is_active: boolean;
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 const STATUS_BADGE: Record<string, string> = {
   new: 'bg-blue-100 text-blue-700', dispatched: 'bg-purple-100 text-purple-700',
   active: 'bg-green-100 text-green-700', review: 'bg-yellow-100 text-yellow-700',
   closed: 'bg-gray-100 text-gray-500', draft: 'bg-gray-100 text-gray-400',
+  stopped: 'bg-red-100 text-red-700',
 };
 const JOB_TYPE_ICON: Record<string, string> = {
   water_loss: '💧', fire_loss: '🔥', mold: '🌿', large_loss: '🏗️', other: '📋',
@@ -67,6 +80,14 @@ const WORK_AUTH_STATUS: Record<string, { label: string; color: string; icon: str
   signed:   { label: 'Signed ✓',   color: 'bg-green-100 text-green-700',  icon: '✅' },
   declined: { label: 'Declined',    color: 'bg-red-100 text-red-700',      icon: '❌' },
 };
+const STOP_REASONS: { value: string; label: string; icon: string; description: string }[] = [
+  { value: 'estimate_only',     label: 'Estimate Only',        icon: '📝', description: 'Client only wants a damage estimate, no restoration work authorized yet' },
+  { value: 'client_cancelled',  label: 'Client Cancelled',     icon: '🚫', description: 'Client called back and does not wish to proceed with restoration' },
+  { value: 'insurance_denied',  label: 'Insurance Denied',     icon: '🏛️', description: 'Insurance claim has been denied or coverage is insufficient' },
+  { value: 'no_damage_found',   label: 'No Damage Found',      icon: '🔍', description: 'Tech arrived on site and found no significant damage warranting restoration' },
+  { value: 'duplicate_file',    label: 'Duplicate File',       icon: '📋', description: 'This job was entered twice — duplicate of an existing active file' },
+  { value: 'other',             label: 'Other Reason',         icon: '💬', description: 'Custom reason — please describe in the notes field' },
+];
 const STEP_META = [
   { num: 1,  label: 'File Creation',       icon: FileText,    color: 'blue'   },
   { num: 2,  label: 'Dispatch',            icon: Navigation,  color: 'purple' },
@@ -84,6 +105,11 @@ const STEP_META = [
   { num: 14, label: 'Close Checklist',     icon: UserCheck,   color: 'teal'   },
   { num: 15, label: 'Invoice & Close',     icon: Star,        color: 'gold'   },
 ];
+
+const ROLE_LABELS: Record<string, string> = {
+  admin: 'Admin', office: 'Office', estimator: 'Estimator',
+  lead_tech: 'Lead Tech', tech: 'Technician', subcontractor: 'Subcontractor', other: 'Other',
+};
 
 // ─── Helper: Contact Action Buttons ──────────────────────────────────────────
 function ContactActions({ phone, email, name }: { phone?: string | null; email?: string | null; name?: string | null }) {
@@ -124,6 +150,42 @@ function InfoRow({ icon: Icon, label, value, mono = false }: { icon: React.Eleme
   );
 }
 
+// ─── Helper: Employee Dropdown ────────────────────────────────────────────────
+function EmployeeSelect({
+  members,
+  selectedId,
+  onSelect,
+  placeholder = 'Select team member…',
+}: {
+  members: TeamMember[];
+  selectedId: string;
+  onSelect: (id: string, member: TeamMember | null) => void;
+  placeholder?: string;
+}) {
+  return (
+    <div className="relative">
+      <Users className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+      <select
+        value={selectedId}
+        onChange={e => {
+          const id = e.target.value;
+          const m = members.find(x => x.id === id) || null;
+          onSelect(id, m);
+        }}
+        className="w-full pl-8 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none bg-white"
+      >
+        <option value="">{placeholder}</option>
+        {members.filter(m => m.is_active).map(m => (
+          <option key={m.id} value={m.id}>
+            {m.full_name} — {ROLE_LABELS[m.role] || m.role}
+          </option>
+        ))}
+      </select>
+      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -142,15 +204,26 @@ export default function JobDetailPage() {
   const [saveSuccess, setSaveSuccess] = useState('');
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [userId, setUserId] = useState('');
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+
+  // Stop Job modal state
+  const [showStopModal, setShowStopModal] = useState(false);
+  const [stopForm, setStopForm] = useState({ stop_reason: '', stop_notes: '' });
+  const [stoppingJob, setStoppingJob] = useState(false);
+  const [showOverrideModal, setShowOverrideModal] = useState(false);
+  const [overrideReason, setOverrideReason] = useState('');
+  const [overriding, setOverriding] = useState(false);
 
   // Editable fields for step panels
   const [step1Form, setStep1Form] = useState({
     lead_source: 'manual', lead_source_detail: '',
     created_by_name: '', created_by_phone: '', created_by_email: '',
+    created_by_member_id: '',
   });
   const [step2Form, setStep2Form] = useState({
     dispatched_to_name: '', dispatched_to_phone: '', dispatched_to_email: '',
     dispatched_at: '', dispatch_notes: '', eta_minutes: '',
+    dispatched_member_id: '',
   });
   const [step3Form, setStep3Form] = useState({
     work_auth_status: 'pending', work_auth_signed_by: '',
@@ -162,10 +235,12 @@ export default function JobDetailPage() {
       if (!session) { router.push('/login'); return; }
       setUserId(session.user.id);
 
-      const [jobRes, stepsRes, docsRes] = await Promise.all([
+      const [jobRes, stepsRes, docsRes, teamRes] = await Promise.all([
         supabase.from('jobs').select('*').eq('id', id).eq('user_id', session.user.id).single(),
         supabase.from('workflow_steps').select('*').eq('job_id', id).order('step_number'),
         supabase.from('documents').select('*').eq('job_id', id).order('created_at', { ascending: false }),
+        supabase.from('team_members').select('*').eq('user_id', session.user.id)
+          .eq('is_active', true).order('full_name'),
       ]);
 
       if (jobRes.error || !jobRes.data) {
@@ -175,6 +250,7 @@ export default function JobDetailPage() {
         setJob(j);
         setWorkflowSteps(stepsRes.data || []);
         setDocuments(docsRes.data || []);
+        setTeamMembers(teamRes.data || []);
         // Pre-fill forms
         setStep1Form({
           lead_source: j.lead_source || 'manual',
@@ -182,6 +258,7 @@ export default function JobDetailPage() {
           created_by_name: j.created_by_name || '',
           created_by_phone: j.created_by_phone || '',
           created_by_email: j.created_by_email || '',
+          created_by_member_id: j.created_by_member_id || '',
         });
         setStep2Form({
           dispatched_to_name: j.dispatched_to_name || '',
@@ -190,12 +267,12 @@ export default function JobDetailPage() {
           dispatched_at: j.dispatched_at ? j.dispatched_at.slice(0, 16) : '',
           dispatch_notes: j.dispatch_notes || '',
           eta_minutes: j.eta_minutes?.toString() || '',
+          dispatched_member_id: j.dispatched_member_id || '',
         });
         setStep3Form({
           work_auth_status: j.work_auth_status || 'pending',
           work_auth_signed_by: j.work_auth_signed_by || '',
         });
-        // Auto-open the active step panel
         setActiveStep(j.current_step);
       }
       setLoading(false);
@@ -239,9 +316,17 @@ export default function JobDetailPage() {
       created_by_name: step1Form.created_by_name || null,
       created_by_phone: step1Form.created_by_phone || null,
       created_by_email: step1Form.created_by_email || null,
+      created_by_member_id: step1Form.created_by_member_id || null,
       updated_at: new Date().toISOString(),
     }).eq('id', job.id);
-    setJob(prev => prev ? { ...prev, ...step1Form } : prev);
+    setJob(prev => prev ? { ...prev,
+      lead_source: step1Form.lead_source,
+      lead_source_detail: step1Form.lead_source_detail || null,
+      created_by_name: step1Form.created_by_name || null,
+      created_by_phone: step1Form.created_by_phone || null,
+      created_by_email: step1Form.created_by_email || null,
+      created_by_member_id: step1Form.created_by_member_id || null,
+    } : prev);
     setSaving(false); setSaveSuccess('Step 1 saved!'); setEditingStep(null);
     setTimeout(() => setSaveSuccess(''), 3000);
   };
@@ -256,9 +341,9 @@ export default function JobDetailPage() {
       dispatched_at: step2Form.dispatched_at ? new Date(step2Form.dispatched_at).toISOString() : null,
       dispatch_notes: step2Form.dispatch_notes || null,
       eta_minutes: step2Form.eta_minutes ? parseInt(step2Form.eta_minutes) : null,
+      dispatched_member_id: step2Form.dispatched_member_id || null,
       updated_at: new Date().toISOString(),
     };
-    // Auto-set status to dispatched if tech is assigned
     if (step2Form.dispatched_to_name && job.status === 'new') {
       payload.status = 'dispatched';
       setJob(prev => prev ? { ...prev, status: 'dispatched' } : prev);
@@ -271,6 +356,7 @@ export default function JobDetailPage() {
       dispatched_at: step2Form.dispatched_at ? new Date(step2Form.dispatched_at).toISOString() : null,
       dispatch_notes: step2Form.dispatch_notes || null,
       eta_minutes: step2Form.eta_minutes ? parseInt(step2Form.eta_minutes) : null,
+      dispatched_member_id: step2Form.dispatched_member_id || null,
     } : prev);
     setSaving(false); setSaveSuccess('Dispatch saved!'); setEditingStep(null);
     setTimeout(() => setSaveSuccess(''), 3000);
@@ -300,6 +386,67 @@ export default function JobDetailPage() {
     setTimeout(() => setSaveSuccess(''), 3000);
   };
 
+  // ── Stop Job ─────────────────────────────────────────────────────────────────
+  const handleStopJob = async () => {
+    if (!job || !stopForm.stop_reason) return;
+    setStoppingJob(true);
+    const now = new Date().toISOString();
+    const { data: { session } } = await supabase.auth.getSession();
+    const stoppedBy = session?.user?.email || 'Unknown';
+    await supabase.from('jobs').update({
+      stopped: true,
+      stop_reason: stopForm.stop_reason,
+      stop_notes: stopForm.stop_notes || null,
+      stopped_at: now,
+      stopped_by: stoppedBy,
+      status: 'stopped',
+      updated_at: now,
+    }).eq('id', job.id);
+    setJob(prev => prev ? { ...prev,
+      stopped: true,
+      stop_reason: stopForm.stop_reason,
+      stop_notes: stopForm.stop_notes || null,
+      stopped_at: now,
+      stopped_by: stoppedBy,
+      status: 'stopped',
+    } : prev);
+    setStoppingJob(false);
+    setShowStopModal(false);
+    setSaveSuccess('Job stopped and flagged.');
+    setTimeout(() => setSaveSuccess(''), 4000);
+  };
+
+  // ── Override (re-activate stopped job) ───────────────────────────────────────
+  const handleOverride = async () => {
+    if (!job || !overrideReason.trim()) return;
+    setOverriding(true);
+    const now = new Date().toISOString();
+    const { data: { session } } = await supabase.auth.getSession();
+    const overrideBy = session?.user?.email || 'Unknown';
+    await supabase.from('jobs').update({
+      stopped: false,
+      override_active: true,
+      override_reason: overrideReason.trim(),
+      override_by: overrideBy,
+      override_at: now,
+      status: 'active',
+      updated_at: now,
+    }).eq('id', job.id);
+    setJob(prev => prev ? { ...prev,
+      stopped: false,
+      override_active: true,
+      override_reason: overrideReason.trim(),
+      override_by: overrideBy,
+      override_at: now,
+      status: 'active',
+    } : prev);
+    setOverriding(false);
+    setShowOverrideModal(false);
+    setOverrideReason('');
+    setSaveSuccess('Job override approved — job is now Active.');
+    setTimeout(() => setSaveSuccess(''), 4000);
+  };
+
   const uploadWorkAuthDoc = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !job) return;
@@ -324,6 +471,16 @@ export default function JobDetailPage() {
 
   const getStepStatus = (num: number) => workflowSteps.find(s => s.step_number === num)?.status || 'pending';
 
+  // Prevent spacebar from scrolling the page when a non-input element has focus
+  const handlePageKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === ' ') {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
+        e.preventDefault();
+      }
+    }
+  };
+
   // ─── Render ─────────────────────────────────────────────────────────────────
   if (loading) return (
     <div className="flex items-center justify-center h-full min-h-[400px]">
@@ -341,19 +498,127 @@ export default function JobDetailPage() {
   const ls = LEAD_SOURCE_ICONS[job.lead_source || 'manual'] || LEAD_SOURCE_ICONS.manual;
   const wa = WORK_AUTH_STATUS[job.work_auth_status || 'pending'] || WORK_AUTH_STATUS.pending;
   const wafDocs = documents.filter(d => d.doc_type === 'waf');
-
-  // Prevent spacebar from scrolling the page when a non-input element has focus
-  const handlePageKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === ' ') {
-      const tag = (e.target as HTMLElement).tagName;
-      if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
-        e.preventDefault();
-      }
-    }
-  };
+  const selectedStopReason = STOP_REASONS.find(r => r.value === job.stop_reason);
 
   return (
     <div className="p-4 lg:p-6 max-w-6xl mx-auto space-y-4" onKeyDown={handlePageKeyDown}>
+
+      {/* ── Stop Job Modal ── */}
+      {showStopModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) setShowStopModal(false); }}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                  <StopCircle className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Stop This Job</h2>
+                  <p className="text-xs text-gray-500">Select a reason — this will flag the job and halt workflow progression.</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setShowStopModal(false)} onKeyDown={e => { if (e.key === ' ') e.preventDefault(); }}
+                className="p-1.5 hover:bg-gray-100 rounded-lg transition"><X className="w-5 h-5 text-gray-400" /></button>
+            </div>
+
+            {/* Reason grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {STOP_REASONS.map(r => (
+                <button type="button" key={r.value}
+                  onClick={() => setStopForm(p => ({ ...p, stop_reason: r.value }))}
+                  onKeyDown={e => { if (e.key === ' ') e.preventDefault(); }}
+                  className={`text-left p-3 rounded-xl border-2 transition ${
+                    stopForm.stop_reason === r.value
+                      ? 'border-red-400 bg-red-50'
+                      : 'border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-white'
+                  }`}>
+                  <div className="text-xl mb-1">{r.icon}</div>
+                  <p className={`text-sm font-semibold ${stopForm.stop_reason === r.value ? 'text-red-700' : 'text-gray-800'}`}>{r.label}</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">{r.description}</p>
+                </button>
+              ))}
+            </div>
+
+            {/* Notes */}
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Additional Notes (optional)</label>
+              <textarea value={stopForm.stop_notes}
+                onChange={e => setStopForm(p => ({ ...p, stop_notes: e.target.value }))}
+                rows={3} placeholder="Any additional context about why this job is being stopped…"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-400 outline-none resize-none" />
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3">
+              <button type="button" onClick={handleStopJob}
+                disabled={!stopForm.stop_reason || stoppingJob}
+                onKeyDown={e => { if (e.key === ' ') e.preventDefault(); }}
+                className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white font-semibold py-2.5 rounded-lg transition text-sm">
+                {stoppingJob ? <Loader2 className="w-4 h-4 animate-spin" /> : <StopCircle className="w-4 h-4" />}
+                {stoppingJob ? 'Stopping…' : 'Confirm Stop Job'}
+              </button>
+              <button type="button" onClick={() => setShowStopModal(false)}
+                onKeyDown={e => { if (e.key === ' ') e.preventDefault(); }}
+                className="px-5 py-2.5 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50 transition">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Override Modal ── */}
+      {showOverrideModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) setShowOverrideModal(false); }}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Override — Re-activate Job</h2>
+                  <p className="text-xs text-gray-500">Explain why this stopped job should continue.</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setShowOverrideModal(false)} onKeyDown={e => { if (e.key === ' ') e.preventDefault(); }}
+                className="p-1.5 hover:bg-gray-100 rounded-lg transition"><X className="w-5 h-5 text-gray-400" /></button>
+            </div>
+
+            {job.stop_reason && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
+                <p className="font-semibold">Previously stopped:</p>
+                <p>{selectedStopReason?.label || job.stop_reason}</p>
+                {job.stop_notes && <p className="text-xs mt-1 text-red-500">{job.stop_notes}</p>}
+              </div>
+            )}
+
+            <div>
+              <label className="text-xs font-medium text-gray-700 mb-1 block">Override Reason <span className="text-red-500">*</span></label>
+              <textarea value={overrideReason}
+                onChange={e => setOverrideReason(e.target.value)}
+                rows={3} placeholder="e.g. Client confirmed they want full restoration after reviewing estimate…"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-400 outline-none resize-none" />
+            </div>
+
+            <div className="flex gap-3">
+              <button type="button" onClick={handleOverride}
+                disabled={!overrideReason.trim() || overriding}
+                onKeyDown={e => { if (e.key === ' ') e.preventDefault(); }}
+                className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-semibold py-2.5 rounded-lg transition text-sm">
+                {overriding ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                {overriding ? 'Processing…' : 'Approve Override'}
+              </button>
+              <button type="button" onClick={() => setShowOverrideModal(false)}
+                onKeyDown={e => { if (e.key === ' ') e.preventDefault(); }}
+                className="px-5 py-2.5 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50 transition">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Header ── */}
       <div className="flex items-start gap-3">
         <Link href="/jobs" className="p-2 hover:bg-gray-100 rounded-lg transition mt-1">
@@ -367,21 +632,76 @@ export default function JobDetailPage() {
             <span className={`text-sm font-medium px-3 py-1 rounded-full capitalize ${STATUS_BADGE[job.status] || 'bg-gray-100 text-gray-600'}`}>
               {job.status}
             </span>
+            {job.override_active && (
+              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+                ⚡ Override Active
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-1 text-gray-500 text-sm mt-1">
             <MapPin className="w-3.5 h-3.5" />
             {job.property_address}{job.property_city ? `, ${job.property_city}` : ''}{job.property_postal_code ? ` ${job.property_postal_code}` : ''}
           </div>
         </div>
-        <select value={job.status} onChange={e => updateStatus(e.target.value)} disabled={statusUpdating}
-          className="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
-          <option value="new">New</option>
-          <option value="dispatched">Dispatched</option>
-          <option value="active">Active</option>
-          <option value="review">In Review</option>
-          <option value="closed">Closed</option>
-        </select>
+
+        {/* Status select + Stop Job button */}
+        <div className="flex items-center gap-2 shrink-0">
+          {!job.stopped ? (
+            <>
+              <select value={job.status} onChange={e => updateStatus(e.target.value)} disabled={statusUpdating}
+                className="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                <option value="new">New</option>
+                <option value="dispatched">Dispatched</option>
+                <option value="active">Active</option>
+                <option value="review">In Review</option>
+                <option value="closed">Closed</option>
+              </select>
+              <button type="button"
+                onClick={() => { setStopForm({ stop_reason: '', stop_notes: '' }); setShowStopModal(true); }}
+                onKeyDown={e => { if (e.key === ' ') e.preventDefault(); }}
+                className="flex items-center gap-1.5 text-sm font-semibold text-red-600 border border-red-300 hover:bg-red-50 px-3 py-2 rounded-lg transition">
+                <StopCircle className="w-4 h-4" /> Stop Job
+              </button>
+            </>
+          ) : (
+            <button type="button"
+              onClick={() => setShowOverrideModal(true)}
+              onKeyDown={e => { if (e.key === ' ') e.preventDefault(); }}
+              className="flex items-center gap-1.5 text-sm font-semibold text-green-700 border border-green-300 bg-green-50 hover:bg-green-100 px-3 py-2 rounded-lg transition">
+              <CheckCircle className="w-4 h-4" /> Override — Re-activate
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* ── Stopped Job Banner ── */}
+      {job.stopped && (
+        <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 flex items-start gap-3">
+          <StopCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-bold text-red-800">This Job Has Been Stopped</p>
+            <p className="text-sm text-red-700 mt-0.5">
+              <strong>Reason:</strong> {selectedStopReason?.icon} {selectedStopReason?.label || job.stop_reason}
+            </p>
+            {job.stop_notes && <p className="text-xs text-red-600 mt-1">{job.stop_notes}</p>}
+            {job.stopped_at && <p className="text-xs text-red-500 mt-1">Stopped: {new Date(job.stopped_at).toLocaleString()} {job.stopped_by ? `by ${job.stopped_by}` : ''}</p>}
+            <p className="text-xs text-red-500 mt-2 font-medium">
+              📋 File remains open for reference. Click &quot;Override — Re-activate&quot; if the job should continue.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Override info banner ── */}
+      {job.override_active && !job.stopped && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2 text-sm">
+          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold text-amber-800">Override Active</p>
+            <p className="text-xs text-amber-700">{job.override_reason} — approved by {job.override_by} {job.override_at ? `on ${new Date(job.override_at).toLocaleDateString()}` : ''}</p>
+          </div>
+        </div>
+      )}
 
       {/* Save success */}
       {saveSuccess && (
@@ -484,13 +804,40 @@ export default function JobDetailPage() {
                     </div>
                   </div>
 
-                  {/* File Created By */}
+                  {/* File Created By — with employee dropdown */}
                   <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">File Created By</p>
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">File Created By</p>
+                      {teamMembers.length === 0 && editingStep !== 1 && (
+                        <Link href="/settings" className="text-xs text-blue-500 hover:underline flex items-center gap-1">
+                          <Users className="w-3 h-3" /> Add team
+                        </Link>
+                      )}
+                    </div>
                     {/* edit form – always mounted */}
                     <div className={editingStep === 1 ? 'space-y-2' : 'hidden'}>
+                      {teamMembers.length > 0 && (
+                        <div>
+                          <label className="text-xs text-gray-500 mb-1 block">Select from your team</label>
+                          <EmployeeSelect
+                            members={teamMembers}
+                            selectedId={step1Form.created_by_member_id}
+                            onSelect={(id, member) => {
+                              setStep1Form(p => ({
+                                ...p,
+                                created_by_member_id: id,
+                                created_by_name: member?.full_name || p.created_by_name,
+                                created_by_phone: member?.cell_phone || p.created_by_phone,
+                                created_by_email: member?.email || p.created_by_email,
+                              }));
+                            }}
+                            placeholder="— Select team member —"
+                          />
+                          <p className="text-[10px] text-gray-400 mt-1">Or fill manually below</p>
+                        </div>
+                      )}
                       <input type="text" value={step1Form.created_by_name}
-                        onChange={e => setStep1Form(p => ({ ...p, created_by_name: e.target.value }))}
+                        onChange={e => setStep1Form(p => ({ ...p, created_by_name: e.target.value, created_by_member_id: '' }))}
                         placeholder="Staff name"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
                       <input type="tel" value={step1Form.created_by_phone}
@@ -582,8 +929,28 @@ export default function JobDetailPage() {
                     </p>
                     {/* edit form – always mounted */}
                     <div className={editingStep === 2 ? 'space-y-2' : 'hidden'}>
+                      {teamMembers.length > 0 && (
+                        <div>
+                          <label className="text-xs text-gray-500 mb-1 block">Select from your team</label>
+                          <EmployeeSelect
+                            members={teamMembers}
+                            selectedId={step2Form.dispatched_member_id}
+                            onSelect={(id, member) => {
+                              setStep2Form(p => ({
+                                ...p,
+                                dispatched_member_id: id,
+                                dispatched_to_name: member?.full_name || p.dispatched_to_name,
+                                dispatched_to_phone: member?.cell_phone || p.dispatched_to_phone,
+                                dispatched_to_email: member?.email || p.dispatched_to_email,
+                              }));
+                            }}
+                            placeholder="— Assign a technician —"
+                          />
+                          <p className="text-[10px] text-gray-400 mt-1">Or fill manually below</p>
+                        </div>
+                      )}
                       <input type="text" value={step2Form.dispatched_to_name}
-                        onChange={e => setStep2Form(p => ({ ...p, dispatched_to_name: e.target.value }))}
+                        onChange={e => setStep2Form(p => ({ ...p, dispatched_to_name: e.target.value, dispatched_member_id: '' }))}
                         placeholder="Tech name"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
                       <input type="tel" value={step2Form.dispatched_to_phone}
