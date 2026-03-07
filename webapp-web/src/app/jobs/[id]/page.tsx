@@ -342,8 +342,18 @@ export default function JobDetailPage() {
   const wa = WORK_AUTH_STATUS[job.work_auth_status || 'pending'] || WORK_AUTH_STATUS.pending;
   const wafDocs = documents.filter(d => d.doc_type === 'waf');
 
+  // Prevent spacebar from scrolling the page when a non-input element has focus
+  const handlePageKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === ' ') {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
+        e.preventDefault();
+      }
+    }
+  };
+
   return (
-    <div className="p-4 lg:p-6 max-w-6xl mx-auto space-y-4">
+    <div className="p-4 lg:p-6 max-w-6xl mx-auto space-y-4" onKeyDown={handlePageKeyDown}>
       {/* ── Header ── */}
       <div className="flex items-start gap-3">
         <Link href="/jobs" className="p-2 hover:bg-gray-100 rounded-lg transition mt-1">
@@ -398,7 +408,9 @@ export default function JobDetailPage() {
             return (
               <button
                 key={step.num}
+                type="button"
                 onClick={() => setActiveStep(isActive ? null : step.num)}
+                onKeyDown={e => { if (e.key === ' ' || e.key === 'Spacebar') e.preventDefault(); }}
                 className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium border-b-2 transition whitespace-nowrap ${
                   isActive
                     ? 'border-blue-600 text-blue-700 bg-white'
@@ -437,7 +449,8 @@ export default function JobDetailPage() {
                       Created {new Date(job.created_at).toLocaleString()}
                     </span>
                   </h3>
-                  <button onClick={() => setEditingStep(editingStep === 1 ? null : 1)}
+                  <button type="button" onClick={() => setEditingStep(editingStep === 1 ? null : 1)}
+                    onKeyDown={e => { if (e.key === ' ') e.preventDefault(); }}
                     className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded-lg hover:bg-blue-50 transition">
                     <Edit3 className="w-3.5 h-3.5" /> {editingStep === 1 ? 'Cancel' : 'Edit'}
                   </button>
@@ -447,65 +460,67 @@ export default function JobDetailPage() {
                   {/* Lead Source card */}
                   <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Lead Source</p>
-                    {editingStep === 1 ? (
-                      <div className="space-y-3">
-                        <select value={step1Form.lead_source} onChange={e => setStep1Form(p => ({ ...p, lead_source: e.target.value }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                          {Object.entries(LEAD_SOURCE_ICONS).map(([val, meta]) => (
-                            <option key={val} value={val}>{meta.icon} {meta.label}</option>
-                          ))}
-                        </select>
-                        <input type="text" value={step1Form.lead_source_detail}
-                          onChange={e => setStep1Form(p => ({ ...p, lead_source_detail: e.target.value }))}
-                          placeholder="Detail (e.g. Google Ad – Water Damage Ottawa)"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-                      </div>
-                    ) : (
-                      <div>
-                        <span className={`inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg ${ls.color}`}>
-                          {ls.icon} {ls.label}
-                        </span>
-                        {job.lead_source_detail && (
-                          <p className="text-xs text-gray-500 mt-2">{job.lead_source_detail}</p>
-                        )}
-                      </div>
-                    )}
+                    {/* edit form – always mounted, hidden when not editing */}
+                    <div className={editingStep === 1 ? 'space-y-3' : 'hidden'}>
+                      <select value={step1Form.lead_source} onChange={e => setStep1Form(p => ({ ...p, lead_source: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                        {Object.entries(LEAD_SOURCE_ICONS).map(([val, meta]) => (
+                          <option key={val} value={val}>{meta.icon} {meta.label}</option>
+                        ))}
+                      </select>
+                      <input type="text" value={step1Form.lead_source_detail}
+                        onChange={e => setStep1Form(p => ({ ...p, lead_source_detail: e.target.value }))}
+                        placeholder="Detail (e.g. Google Ad – Water Damage Ottawa)"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                    </div>
+                    {/* view – hidden when editing */}
+                    <div className={editingStep === 1 ? 'hidden' : ''}>
+                      <span className={`inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg ${ls.color}`}>
+                        {ls.icon} {ls.label}
+                      </span>
+                      {job.lead_source_detail && (
+                        <p className="text-xs text-gray-500 mt-2">{job.lead_source_detail}</p>
+                      )}
+                    </div>
                   </div>
 
                   {/* File Created By */}
                   <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">File Created By</p>
-                    {editingStep === 1 ? (
-                      <div className="space-y-2">
-                        <input type="text" value={step1Form.created_by_name}
-                          onChange={e => setStep1Form(p => ({ ...p, created_by_name: e.target.value }))}
-                          placeholder="Staff name"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-                        <input type="tel" value={step1Form.created_by_phone}
-                          onChange={e => setStep1Form(p => ({ ...p, created_by_phone: e.target.value }))}
-                          placeholder="Cell number"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-                        <input type="email" value={step1Form.created_by_email}
-                          onChange={e => setStep1Form(p => ({ ...p, created_by_email: e.target.value }))}
-                          placeholder="Email"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-                      </div>
-                    ) : job.created_by_name ? (
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                            <User className="w-4 h-4 text-blue-600" />
+                    {/* edit form – always mounted */}
+                    <div className={editingStep === 1 ? 'space-y-2' : 'hidden'}>
+                      <input type="text" value={step1Form.created_by_name}
+                        onChange={e => setStep1Form(p => ({ ...p, created_by_name: e.target.value }))}
+                        placeholder="Staff name"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                      <input type="tel" value={step1Form.created_by_phone}
+                        onChange={e => setStep1Form(p => ({ ...p, created_by_phone: e.target.value }))}
+                        placeholder="Cell number"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                      <input type="email" value={step1Form.created_by_email}
+                        onChange={e => setStep1Form(p => ({ ...p, created_by_email: e.target.value }))}
+                        placeholder="Email"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                    </div>
+                    {/* view */}
+                    <div className={editingStep === 1 ? 'hidden' : ''}>
+                      {job.created_by_name ? (
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                              <User className="w-4 h-4 text-blue-600" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-gray-800">{job.created_by_name}</p>
+                              {job.created_by_phone && <p className="text-xs text-gray-500">{job.created_by_phone}</p>}
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-sm font-semibold text-gray-800">{job.created_by_name}</p>
-                            {job.created_by_phone && <p className="text-xs text-gray-500">{job.created_by_phone}</p>}
-                          </div>
+                          <ContactActions phone={job.created_by_phone} email={job.created_by_email} name={job.created_by_name} />
                         </div>
-                        <ContactActions phone={job.created_by_phone} email={job.created_by_email} name={job.created_by_name} />
-                      </div>
-                    ) : (
-                      <p className="text-sm text-gray-400 italic">Not recorded — click Edit to add staff info</p>
-                    )}
+                      ) : (
+                        <p className="text-sm text-gray-400 italic">Not recorded — click Edit to add staff info</p>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -520,18 +535,18 @@ export default function JobDetailPage() {
                   <ContactActions phone={job.insured_phone} email={job.insured_email} name={job.insured_name} />
                 </div>
 
-                {editingStep === 1 && (
-                  <button onClick={saveStep1} disabled={saving}
+                <div className={editingStep === 1 ? '' : 'hidden'}>
+                  <button type="button" onClick={saveStep1} disabled={saving}
                     className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition">
                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     Save File Creation Data
                   </button>
-                )}
+                </div>
 
                 {/* Advance button */}
                 {getStepStatus(1) !== 'complete' && (
                   <div className="pt-2 border-t border-gray-100">
-                    <button onClick={() => advanceWorkflowStep(1)}
+                    <button type="button" onClick={() => advanceWorkflowStep(1)}
                       className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
                       <CheckCircle className="w-4 h-4" /> Mark Step 1 Complete → Move to Dispatch
                     </button>
@@ -552,7 +567,8 @@ export default function JobDetailPage() {
                       </span>
                     )}
                   </h3>
-                  <button onClick={() => setEditingStep(editingStep === 2 ? null : 2)}
+                  <button type="button" onClick={() => setEditingStep(editingStep === 2 ? null : 2)}
+                    onKeyDown={e => { if (e.key === ' ') e.preventDefault(); }}
                     className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded-lg hover:bg-blue-50 transition">
                     <Edit3 className="w-3.5 h-3.5" /> {editingStep === 2 ? 'Cancel' : 'Edit'}
                   </button>
@@ -564,97 +580,96 @@ export default function JobDetailPage() {
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
                       Technician / Team Assigned
                     </p>
-                    {editingStep === 2 ? (
-                      <div className="space-y-2">
-                        <input type="text" value={step2Form.dispatched_to_name}
-                          onChange={e => setStep2Form(p => ({ ...p, dispatched_to_name: e.target.value }))}
-                          placeholder="Tech name"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-                        <input type="tel" value={step2Form.dispatched_to_phone}
-                          onChange={e => setStep2Form(p => ({ ...p, dispatched_to_phone: e.target.value }))}
-                          placeholder="Cell number"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-                        <input type="email" value={step2Form.dispatched_to_email}
-                          onChange={e => setStep2Form(p => ({ ...p, dispatched_to_email: e.target.value }))}
-                          placeholder="Email"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-                      </div>
-                    ) : job.dispatched_to_name ? (
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className="w-9 h-9 rounded-full bg-purple-100 flex items-center justify-center">
-                            <UserCheck className="w-4 h-4 text-purple-600" />
+                    {/* edit form – always mounted */}
+                    <div className={editingStep === 2 ? 'space-y-2' : 'hidden'}>
+                      <input type="text" value={step2Form.dispatched_to_name}
+                        onChange={e => setStep2Form(p => ({ ...p, dispatched_to_name: e.target.value }))}
+                        placeholder="Tech name"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                      <input type="tel" value={step2Form.dispatched_to_phone}
+                        onChange={e => setStep2Form(p => ({ ...p, dispatched_to_phone: e.target.value }))}
+                        placeholder="Cell number"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                      <input type="email" value={step2Form.dispatched_to_email}
+                        onChange={e => setStep2Form(p => ({ ...p, dispatched_to_email: e.target.value }))}
+                        placeholder="Email"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                    </div>
+                    {/* view */}
+                    <div className={editingStep === 2 ? 'hidden' : ''}>
+                      {job.dispatched_to_name ? (
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="w-9 h-9 rounded-full bg-purple-100 flex items-center justify-center">
+                              <UserCheck className="w-4 h-4 text-purple-600" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-gray-800">{job.dispatched_to_name}</p>
+                              {job.dispatched_to_phone && <p className="text-xs text-gray-500">{job.dispatched_to_phone}</p>}
+                              {job.dispatched_to_email && <p className="text-xs text-gray-400">{job.dispatched_to_email}</p>}
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-sm font-semibold text-gray-800">{job.dispatched_to_name}</p>
-                            {job.dispatched_to_phone && <p className="text-xs text-gray-500">{job.dispatched_to_phone}</p>}
-                            {job.dispatched_to_email && <p className="text-xs text-gray-400">{job.dispatched_to_email}</p>}
-                          </div>
+                          <ContactActions phone={job.dispatched_to_phone} email={job.dispatched_to_email} name={job.dispatched_to_name} />
                         </div>
-                        <ContactActions phone={job.dispatched_to_phone} email={job.dispatched_to_email} name={job.dispatched_to_name} />
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 text-sm text-gray-400 italic">
-                        <AlertTriangle className="w-4 h-4 text-yellow-400" />
-                        Not dispatched yet — click Edit to assign a technician
-                      </div>
-                    )}
+                      ) : (
+                        <div className="flex items-center gap-2 text-sm text-gray-400 italic">
+                          <AlertTriangle className="w-4 h-4 text-yellow-400" />
+                          Not dispatched yet — click Edit to assign a technician
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Dispatch timing */}
                   <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Dispatch Timing</p>
-                    {editingStep === 2 ? (
-                      <div className="space-y-2">
-                        <div>
-                          <label className="text-xs text-gray-500 mb-1 block">Dispatch Date & Time</label>
-                          <input type="datetime-local" value={step2Form.dispatched_at}
-                            onChange={e => setStep2Form(p => ({ ...p, dispatched_at: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-500 mb-1 block">ETA (minutes)</label>
-                          <input type="number" min="0" value={step2Form.eta_minutes}
-                            onChange={e => setStep2Form(p => ({ ...p, eta_minutes: e.target.value }))}
-                            placeholder="e.g. 45"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-                        </div>
+                    {/* edit form - timing */}
+                    <div className={editingStep === 2 ? 'space-y-2' : 'hidden'}>
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block">Dispatch Date & Time</label>
+                        <input type="datetime-local" value={step2Form.dispatched_at}
+                          onChange={e => setStep2Form(p => ({ ...p, dispatched_at: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
                       </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <InfoRow icon={Clock}
-                          label="Dispatched At"
-                          value={job.dispatched_at ? new Date(job.dispatched_at).toLocaleString() : <span className="text-gray-300">Not set</span>} />
-                        <InfoRow icon={Navigation}
-                          label="ETA"
-                          value={job.eta_minutes ? `${job.eta_minutes} minutes` : <span className="text-gray-300">Not set</span>} />
-                        <InfoRow icon={Clock}
-                          label="File Created"
-                          value={new Date(job.created_at).toLocaleString()} />
-                        {job.dispatched_at && (
-                          <div className="mt-2 bg-purple-50 rounded-lg p-2 text-xs text-purple-700 font-medium">
-                            ⏱️ Response time: {Math.round((new Date(job.dispatched_at).getTime() - new Date(job.created_at).getTime()) / 60000)} min from file creation
-                          </div>
-                        )}
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block">ETA (minutes)</label>
+                        <input type="number" min="0" value={step2Form.eta_minutes}
+                          onChange={e => setStep2Form(p => ({ ...p, eta_minutes: e.target.value }))}
+                          placeholder="e.g. 45"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
                       </div>
-                    )}
+                    </div>
+                    {/* view - timing */}
+                    <div className={editingStep === 2 ? 'hidden' : 'space-y-2'}>
+                      <InfoRow icon={Clock}
+                        label="Dispatched At"
+                        value={job.dispatched_at ? new Date(job.dispatched_at).toLocaleString() : <span className="text-gray-300">Not set</span>} />
+                      <InfoRow icon={Navigation}
+                        label="ETA"
+                        value={job.eta_minutes ? `${job.eta_minutes} minutes` : <span className="text-gray-300">Not set</span>} />
+                      <InfoRow icon={Clock}
+                        label="File Created"
+                        value={new Date(job.created_at).toLocaleString()} />
+                      {job.dispatched_at && (
+                        <div className="mt-2 bg-purple-50 rounded-lg p-2 text-xs text-purple-700 font-medium">
+                          ⏱️ Response time: {Math.round((new Date(job.dispatched_at).getTime() - new Date(job.created_at).getTime()) / 60000)} min from file creation
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* Dispatch notes */}
-                {(editingStep === 2 || job.dispatch_notes) && (
-                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Dispatch Notes</p>
-                    {editingStep === 2 ? (
-                      <textarea value={step2Form.dispatch_notes}
-                        onChange={e => setStep2Form(p => ({ ...p, dispatch_notes: e.target.value }))}
-                        rows={3} placeholder="Special instructions, access code, lockbox, etc."
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none" />
-                    ) : (
-                      <p className="text-sm text-gray-700 leading-relaxed">{job.dispatch_notes}</p>
-                    )}
-                  </div>
-                )}
+                {/* Dispatch notes - always render textarea to keep focus stable */}
+                <div className={editingStep === 2 || job.dispatch_notes ? 'bg-gray-50 rounded-xl p-4 border border-gray-100' : 'hidden'}>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Dispatch Notes</p>
+                  <textarea value={step2Form.dispatch_notes}
+                    onChange={e => setStep2Form(p => ({ ...p, dispatch_notes: e.target.value }))}
+                    rows={3} placeholder="Special instructions, access code, lockbox, etc."
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none ${editingStep !== 2 ? 'hidden' : ''}`} />
+                  {editingStep !== 2 && job.dispatch_notes && (
+                    <p className="text-sm text-gray-700 leading-relaxed">{job.dispatch_notes}</p>
+                  )}
+                </div>
 
                 {/* Property for navigation */}
                 <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
@@ -671,17 +686,17 @@ export default function JobDetailPage() {
                   </a>
                 </div>
 
-                {editingStep === 2 && (
-                  <button onClick={saveStep2} disabled={saving}
+                <div className={editingStep === 2 ? '' : 'hidden'}>
+                  <button type="button" onClick={saveStep2} disabled={saving}
                     className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition">
                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     Save Dispatch Data
                   </button>
-                )}
+                </div>
 
                 {getStepStatus(2) !== 'complete' && (
                   <div className="pt-2 border-t border-gray-100">
-                    <button onClick={() => advanceWorkflowStep(2)}
+                    <button type="button" onClick={() => advanceWorkflowStep(2)}
                       className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
                       <CheckCircle className="w-4 h-4" /> Mark Dispatched → Move to Work Authorization
                     </button>
@@ -697,7 +712,8 @@ export default function JobDetailPage() {
                   <h3 className="font-semibold text-gray-800 flex items-center gap-2">
                     <Shield className="w-4 h-4 text-green-500" /> Step 3 — Work Authorization
                   </h3>
-                  <button onClick={() => setEditingStep(editingStep === 3 ? null : 3)}
+                  <button type="button" onClick={() => setEditingStep(editingStep === 3 ? null : 3)}
+                    onKeyDown={e => { if (e.key === ' ') e.preventDefault(); }}
                     className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded-lg hover:bg-blue-50 transition">
                     <Edit3 className="w-3.5 h-3.5" /> {editingStep === 3 ? 'Cancel' : 'Edit Status'}
                   </button>
@@ -718,8 +734,8 @@ export default function JobDetailPage() {
                   </div>
                 </div>
 
-                {editingStep === 3 && (
-                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-3">
+                {/* Step 3 edit form - always mounted to preserve focus */}
+                <div className={editingStep === 3 ? 'bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-3' : 'hidden'}>
                     <div>
                       <label className="text-xs font-medium text-gray-600 mb-1 block">Update Authorization Status</label>
                       <select value={step3Form.work_auth_status}
@@ -730,28 +746,26 @@ export default function JobDetailPage() {
                         ))}
                       </select>
                     </div>
-                    {step3Form.work_auth_status === 'signed' && (
-                      <div>
-                        <label className="text-xs font-medium text-gray-600 mb-1 block">Signed By (name)</label>
-                        <input type="text" value={step3Form.work_auth_signed_by}
-                          onChange={e => setStep3Form(p => ({ ...p, work_auth_signed_by: e.target.value }))}
-                          placeholder="e.g. John Peters"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-                      </div>
-                    )}
-                    <button onClick={saveStep3} disabled={saving}
+                    {/* signed-by input - always rendered to keep focus stable */}
+                    <div className={step3Form.work_auth_status === 'signed' ? '' : 'hidden'}>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">Signed By (name)</label>
+                      <input type="text" value={step3Form.work_auth_signed_by}
+                        onChange={e => setStep3Form(p => ({ ...p, work_auth_signed_by: e.target.value }))}
+                        placeholder="e.g. John Peters"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                    </div>
+                    <button type="button" onClick={saveStep3} disabled={saving}
                       className="flex items-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
                       {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                       Save Authorization Status
                     </button>
                   </div>
-                )}
 
                 {/* Document upload */}
                 <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
                   <div className="flex items-center justify-between mb-3">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Work Authorization Form (WAF)</p>
-                    <button onClick={() => fileInputRef.current?.click()} disabled={uploadingDoc}
+                    <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploadingDoc}
                       className="flex items-center gap-1.5 text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-medium px-3 py-1.5 rounded-lg transition">
                       {uploadingDoc ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
                       {uploadingDoc ? 'Uploading…' : 'Upload WAF'}
@@ -814,7 +828,7 @@ export default function JobDetailPage() {
                         <MessageSquare className="w-3 h-3" /> SMS to Insured
                       </a>
                     )}
-                    <button className="flex items-center gap-1.5 text-xs bg-blue-500/30 hover:bg-blue-500/50 text-blue-200 font-medium px-3 py-1.5 rounded-lg border border-blue-400/30 transition">
+                    <button type="button" className="flex items-center gap-1.5 text-xs bg-blue-500/30 hover:bg-blue-500/50 text-blue-200 font-medium px-3 py-1.5 rounded-lg border border-blue-400/30 transition">
                       <PenTool className="w-3 h-3" /> DocuSign (coming soon)
                     </button>
                   </div>
@@ -822,7 +836,7 @@ export default function JobDetailPage() {
 
                 {getStepStatus(3) !== 'complete' && (
                   <div className="pt-2 border-t border-gray-100">
-                    <button
+                  <button type="button"
                       onClick={() => advanceWorkflowStep(3)}
                       disabled={job.work_auth_status !== 'signed'}
                       title={job.work_auth_status !== 'signed' ? 'Set status to Signed first' : ''}
@@ -846,7 +860,7 @@ export default function JobDetailPage() {
                    '⏳ This step is pending.'}
                 </p>
                 {getStepStatus(activeStep) !== 'complete' && getStepStatus(activeStep) === 'in_progress' && (
-                  <button onClick={() => advanceWorkflowStep(activeStep)}
+                  <button type="button" onClick={() => advanceWorkflowStep(activeStep)}
                     className="flex items-center gap-2 mx-auto bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition">
                     <CheckCircle className="w-4 h-4" />
                     Mark Step {activeStep} Complete
