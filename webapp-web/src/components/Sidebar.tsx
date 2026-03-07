@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import {
   LayoutDashboard, Briefcase, Camera, Map, Droplets,
-  FileText, Settings, LogOut, Building2, ChevronRight,
+  FileText, Settings, LogOut, Building2, ChevronRight, Package,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { href: '/photos',      label: 'Photos',       icon: Camera          },
   { href: '/floorplans',  label: 'Floor Plans',  icon: Map             },
   { href: '/moisture',    label: 'Moisture Map', icon: Droplets        },
+  { href: '/equipment',   label: 'Equipment',    icon: Package         },
   { href: '/reports',     label: 'Reports',      icon: FileText        },
   { href: '/settings',    label: 'Settings',     icon: Settings        },
 ];
