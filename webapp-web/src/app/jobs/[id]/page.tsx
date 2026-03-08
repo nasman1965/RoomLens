@@ -11,7 +11,7 @@ import {
   Clock, Send, MessageSquare, Upload, Eye, PenTool, Download,
   Zap, Radio, Globe, PhoneCall, Star, UserCheck, Navigation,
   FileCheck, X, Save, Edit3, ExternalLink, Shield, AlertTriangle,
-  StopCircle, Users, ChevronDown,
+  StopCircle, Users, ChevronDown, Sparkles, RefreshCw, NotebookPen,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -205,6 +205,14 @@ export default function JobDetailPage() {
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [userId, setUserId] = useState('');
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+
+  // AI Notes state
+  const [fieldNotes, setFieldNotes]         = useState('');
+  const [aiNotes, setAiNotes]               = useState('');
+  const [generatingNotes, setGeneratingNotes] = useState(false);
+  const [savingNotes, setSavingNotes]       = useState(false);
+  const [notesError, setNotesError]         = useState('');
+  const [notesSaved, setNotesSaved]         = useState(false);
 
   // Stop Job modal state
   const [showStopModal, setShowStopModal] = useState(false);
@@ -470,6 +478,69 @@ export default function JobDetailPage() {
   };
 
   const getStepStatus = (num: number) => workflowSteps.find(s => s.step_number === num)?.status || 'pending';
+
+  // ── AI Notes ──────────────────────────────────────────────────────────────────
+  const generateNotes = async (saveAfter = false) => {
+    if (!fieldNotes.trim()) return;
+    setGeneratingNotes(true);
+    setNotesError('');
+    setNotesSaved(false);
+    try {
+      const res = await fetch('/api/notes/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          field_notes: fieldNotes,
+          job_id: job?.id,
+          save: saveAfter,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setNotesError(data.error || 'Something went wrong. Please try again.');
+      } else {
+        setAiNotes(data.generated);
+        if (saveAfter && data.saved) {
+          setJob(prev => prev ? { ...prev, notes: data.generated } : prev);
+          setNotesSaved(true);
+          setTimeout(() => setNotesSaved(false), 3000);
+        }
+      }
+    } catch {
+      setNotesError('Network error — please try again.');
+    } finally {
+      setGeneratingNotes(false);
+    }
+  };
+
+  const saveAiNotes = async () => {
+    if (!aiNotes.trim() || !job) return;
+    setSavingNotes(true);
+    setNotesError('');
+    const res = await fetch('/api/notes/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        field_notes: fieldNotes,
+        job_id: job.id,
+        save: true,
+      }),
+    });
+    const data = await res.json();
+    if (data.saved) {
+      setJob(prev => prev ? { ...prev, notes: aiNotes } : prev);
+      setNotesSaved(true);
+      setTimeout(() => setNotesSaved(false), 3000);
+    } else {
+      // fallback: direct Supabase update
+      await supabase.from('jobs').update({ notes: aiNotes, updated_at: new Date().toISOString() }).eq('id', job.id);
+      setJob(prev => prev ? { ...prev, notes: aiNotes } : prev);
+      setNotesSaved(true);
+      setTimeout(() => setNotesSaved(false), 3000);
+    }
+    setSavingNotes(false);
+  };
+
 
   // Prevent spacebar from scrolling the page when a non-input element has focus
   const handlePageKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -1237,6 +1308,151 @@ export default function JobDetailPage() {
             )}
           </div>
         )}
+      </div>
+
+      {/* ── AI Notes Generator ── */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-violet-50 to-blue-50">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-blue-600 flex items-center justify-center shrink-0">
+            <Sparkles className="w-4.5 h-4.5 text-white w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="font-bold text-gray-900 text-sm">AI Notes Generator</h3>
+            <p className="text-xs text-gray-500">Type rough field notes → get clean professional text instantly</p>
+          </div>
+        </div>
+
+        <div className="p-5 space-y-4">
+
+          {/* Error */}
+          {notesError && (
+            <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-3">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{notesError}</span>
+            </div>
+          )}
+
+          {/* Saved confirmation */}
+          {notesSaved && (
+            <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg p-3">
+              <CheckCircle className="w-4 h-4 shrink-0" /> Notes saved to this job successfully!
+            </div>
+          )}
+
+          {/* Step 1 — Field Notes input */}
+          <div>
+            <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
+              <NotebookPen className="w-3.5 h-3.5" /> Field Notes
+            </label>
+            <textarea
+              value={fieldNotes}
+              onChange={e => setFieldNotes(e.target.value)}
+              rows={5}
+              placeholder={`Paste or type rough tech notes here — bullets, fragments, anything…\n\nExample:\n- water came from 2nd floor bathroom\n- affected master bedroom ceiling and walls\n- cat 1 water loss, class 2\n- moisture readings 40-60% on drywall\n- extracted standing water approx 15 gallons`}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-violet-400 focus:border-violet-400 outline-none resize-none font-mono leading-relaxed text-gray-700 placeholder-gray-300"
+            />
+          </div>
+
+          {/* Generate button */}
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => generateNotes(false)}
+              disabled={!fieldNotes.trim() || generatingNotes}
+              onKeyDown={e => { if (e.key === ' ') e.preventDefault(); }}
+              className="flex items-center gap-2 bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-700 hover:to-blue-700 disabled:from-gray-300 disabled:to-gray-300 text-white font-semibold text-sm px-5 py-2.5 rounded-xl transition shadow-sm shadow-violet-200"
+            >
+              {generatingNotes
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Writing with AI…</>
+                : <><Sparkles className="w-4 h-4" /> ✨ Write Notes with AI</>
+              }
+            </button>
+            {!fieldNotes.trim() && (
+              <p className="text-xs text-gray-400">Type field notes above first</p>
+            )}
+          </div>
+
+          {/* Step 2 — AI Result */}
+          {(aiNotes || generatingNotes) && (
+            <div className="space-y-3">
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                <Sparkles className="w-3.5 h-3.5 text-violet-500" /> AI-Generated Result
+              </label>
+
+              {/* Shimmer placeholder while generating */}
+              {generatingNotes && !aiNotes && (
+                <div className="space-y-2 animate-pulse">
+                  <div className="h-4 bg-gray-200 rounded w-full" />
+                  <div className="h-4 bg-gray-200 rounded w-5/6" />
+                  <div className="h-4 bg-gray-200 rounded w-full" />
+                  <div className="h-4 bg-gray-200 rounded w-4/6" />
+                  <div className="h-4 bg-gray-200 rounded w-full" />
+                  <div className="h-4 bg-gray-200 rounded w-3/4" />
+                </div>
+              )}
+
+              {aiNotes && (
+                <>
+                  <textarea
+                    value={aiNotes}
+                    onChange={e => setAiNotes(e.target.value)}
+                    rows={7}
+                    className="w-full px-4 py-3 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-400 outline-none resize-none leading-relaxed text-gray-800 bg-violet-50/30"
+                  />
+                  <p className="text-[11px] text-gray-400">✏️ You can edit the text above before saving</p>
+
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-3 pt-1">
+                    <button
+                      type="button"
+                      onClick={saveAiNotes}
+                      disabled={savingNotes || notesSaved}
+                      onKeyDown={e => { if (e.key === ' ') e.preventDefault(); }}
+                      className="flex items-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-semibold text-sm px-5 py-2.5 rounded-xl transition"
+                    >
+                      {savingNotes
+                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
+                        : notesSaved
+                        ? <><CheckCircle className="w-4 h-4" /> Saved!</>
+                        : <><Save className="w-4 h-4" /> Save Notes</>
+                      }
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => generateNotes(false)}
+                      disabled={generatingNotes}
+                      onKeyDown={e => { if (e.key === ' ') e.preventDefault(); }}
+                      className="flex items-center gap-2 border border-violet-300 hover:bg-violet-50 text-violet-700 font-semibold text-sm px-5 py-2.5 rounded-xl transition"
+                    >
+                      {generatingNotes
+                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Regenerating…</>
+                        : <><RefreshCw className="w-4 h-4" /> Regenerate</>
+                      }
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Current saved notes preview */}
+          {job.notes && !aiNotes && (
+            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Current Saved Notes</p>
+              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{job.notes}</p>
+              <button
+                type="button"
+                onClick={() => { setFieldNotes(job.notes || ''); setAiNotes(''); }}
+                onKeyDown={e => { if (e.key === ' ') e.preventDefault(); }}
+                className="mt-3 text-xs text-violet-600 hover:underline flex items-center gap-1"
+              >
+                <Edit3 className="w-3 h-3" /> Load into editor to rewrite with AI
+              </button>
+            </div>
+          )}
+
+        </div>
       </div>
 
       {/* ── Details Grid (always visible below) ── */}
