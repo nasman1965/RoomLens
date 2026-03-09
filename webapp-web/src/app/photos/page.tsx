@@ -5,28 +5,42 @@ import { supabase } from '@/lib/supabase';
 import {
   Camera, Upload, X, ZoomIn, ChevronDown, Tag,
   Loader2, AlertCircle, CheckCircle, Image as ImageIcon,
-  Trash2, Download, Filter
+  Trash2, Download, Filter, MapPin, Clock,
 } from 'lucide-react';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface Job { id: string; insured_name: string; property_address: string; }
+
 interface Photo {
   id: string;
   job_id: string;
   photo_url: string;
-  thumbnail_url: string | null;
-  tags: string[] | null;
-  ai_analysis: { description?: string; damage_type?: string; xactimate_codes?: string[]; severity?: string } | null;
-  created_at: string;
-  room_id: string | null;
+  room_tag: string | null;       // actual DB column name
+  damage_tag: string | null;     // actual DB column name
+  area: string | null;
+  floor: string | null;
+  technician_id: string | null;
+  timestamp: string;             // actual DB column (not created_at)
 }
 
-const TAG_OPTIONS = ['Before', 'After', 'Moisture Damage', 'Mold', 'Structural', 'Ceiling', 'Wall', 'Floor', 'Equipment', 'Evidence'];
-const SEVERITY_COLORS: Record<string, string> = {
-  low: 'bg-green-100 text-green-700',
-  medium: 'bg-yellow-100 text-yellow-700',
-  high: 'bg-orange-100 text-orange-700',
-  critical: 'bg-red-100 text-red-700',
-};
+// ─── Tag/Category Options ──────────────────────────────────────────────────────
+// Maps display labels to damage_tag values (must match DB CHECK constraint)
+const DAMAGE_TAG_OPTIONS: { label: string; value: string }[] = [
+  { label: 'Before',           value: 'pre_existing' },
+  { label: 'Water Damage',     value: 'water'        },
+  { label: 'Fire Damage',      value: 'fire'         },
+  { label: 'Mold',             value: 'mold'         },
+  { label: 'Structural',       value: 'structural'   },
+  { label: 'Evidence',         value: 'evidence'     },
+];
+
+// Room tags (free-form)
+const ROOM_TAG_OPTIONS = ['Ceiling', 'Wall', 'Floor', 'Equipment', 'After'];
+
+function damageTagLabel(val: string | null) {
+  if (!val) return null;
+  return DAMAGE_TAG_OPTIONS.find(o => o.value === val)?.label || val;
+}
 
 export default function PhotosPage() {
   const router = useRouter();
@@ -41,54 +55,52 @@ export default function PhotosPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [lightbox, setLightbox] = useState<Photo | null>(null);
-  const [tagFilter, setTagFilter] = useState('all');
-  const [uploadTags, setUploadTags] = useState<string[]>(['Before']);
+  const [damageTagFilter, setDamageTagFilter] = useState('all');
+  const [uploadDamageTag, setUploadDamageTag] = useState('');
+  const [uploadRoomTag, setUploadRoomTag] = useState('');
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [userId, setUserId] = useState('');
 
-  // Load jobs on mount
+  // ── Load jobs on mount ────────────────────────────────────────────────────
   useEffect(() => {
-    const init = async () => {
+    (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { router.push('/login'); return; }
       setUserId(session.user.id);
-
-      const { data: jobsData } = await supabase
+      const { data } = await supabase
         .from('jobs')
         .select('id, insured_name, property_address')
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false });
-
-      setJobs(jobsData || []);
-      if (jobsData && jobsData.length > 0) {
-        setSelectedJobId(jobsData[0].id);
-      }
+      const jobList = data || [];
+      setJobs(jobList);
+      if (jobList.length > 0) setSelectedJobId(jobList[0].id);
       setLoading(false);
-    };
-    init();
+    })();
   }, [router]);
 
-  // Load photos when job changes
+  // ── Load photos when job changes ──────────────────────────────────────────
   useEffect(() => {
     if (!selectedJobId) { setPhotos([]); return; }
-    const loadPhotos = async () => {
+    (async () => {
       const { data } = await supabase
         .from('damage_photos')
         .select('*')
         .eq('job_id', selectedJobId)
-        .order('created_at', { ascending: false });
+        .order('timestamp', { ascending: false });
       setPhotos(data || []);
-    };
-    loadPhotos();
+    })();
   }, [selectedJobId]);
 
+  // ── File selection ────────────────────────────────────────────────────────
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const valid = files.filter(f => f.type.startsWith('image/'));
     if (valid.length !== files.length) setError('Only image files are accepted.');
-    setPendingFiles(valid.slice(0, 10)); // max 10 at once
+    setPendingFiles(valid.slice(0, 10));
   };
 
+  // ── Upload ────────────────────────────────────────────────────────────────
   const handleUpload = async () => {
     if (!pendingFiles.length || !selectedJobId) return;
     setUploading(true);
@@ -101,7 +113,7 @@ export default function PhotosPage() {
       const ext = file.name.split('.').pop();
       const path = `${userId}/${selectedJobId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
-      // Upload to Supabase Storage
+      // 1. Upload to storage bucket 'damage-photos'
       const { error: storageError } = await supabase.storage
         .from('damage-photos')
         .upload(path, file, { contentType: file.type, upsert: false });
@@ -111,57 +123,69 @@ export default function PhotosPage() {
         continue;
       }
 
-      // Get public URL
+      // 2. Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('damage-photos')
         .getPublicUrl(path);
 
-      // Insert DB record
-      const { data: photoRecord } = await supabase
+      // 3. Insert DB record using correct column names from schema
+      const insertPayload: Record<string, unknown> = {
+        job_id: selectedJobId,
+        photo_url: publicUrl,
+        technician_id: userId,
+      };
+      if (uploadDamageTag) insertPayload.damage_tag = uploadDamageTag;
+      if (uploadRoomTag)   insertPayload.room_tag   = uploadRoomTag;
+
+      const { data: photoRecord, error: dbError } = await supabase
         .from('damage_photos')
-        .insert({
-          job_id: selectedJobId,
-          photo_url: publicUrl,
-          thumbnail_url: publicUrl,
-          tags: uploadTags,
-          technician_id: userId,
-        })
+        .insert(insertPayload)
         .select()
         .single();
 
+      if (dbError) {
+        setError(`Upload stored but DB record failed for ${file.name}: ${dbError.message}`);
+        continue;
+      }
       if (photoRecord) uploaded.push(photoRecord);
       setUploadProgress(Math.round(((i + 1) / pendingFiles.length) * 100));
     }
 
-    setPhotos(prev => [...uploaded, ...prev]);
+    if (uploaded.length > 0) {
+      setPhotos(prev => [...uploaded, ...prev]);
+      setSuccess(`${uploaded.length} photo${uploaded.length > 1 ? 's' : ''} uploaded!`);
+      setTimeout(() => setSuccess(''), 3000);
+    }
     setPendingFiles([]);
     setUploading(false);
-    setSuccess(`${uploaded.length} photo${uploaded.length > 1 ? 's' : ''} uploaded!`);
-    setTimeout(() => setSuccess(''), 3000);
+    setUploadDamageTag('');
+    setUploadRoomTag('');
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // ── Delete ────────────────────────────────────────────────────────────────
   const handleDelete = async (photo: Photo) => {
     if (!confirm('Delete this photo permanently?')) return;
-    const path = photo.photo_url.split('/damage-photos/')[1];
-    if (path) await supabase.storage.from('damage-photos').remove([path]);
+    // Extract storage path from URL
+    const urlParts = photo.photo_url.split('/damage-photos/');
+    if (urlParts[1]) {
+      await supabase.storage.from('damage-photos').remove([urlParts[1]]);
+    }
     await supabase.from('damage_photos').delete().eq('id', photo.id);
     setPhotos(prev => prev.filter(p => p.id !== photo.id));
     if (lightbox?.id === photo.id) setLightbox(null);
+    setSuccess('Photo deleted.');
+    setTimeout(() => setSuccess(''), 2000);
   };
 
-  const toggleUploadTag = (tag: string) => {
-    setUploadTags(prev =>
-      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
-    );
-  };
-
-  const filteredPhotos = tagFilter === 'all'
+  // ── Filtered photos ───────────────────────────────────────────────────────
+  const filteredPhotos = damageTagFilter === 'all'
     ? photos
-    : photos.filter(p => p.tags?.includes(tagFilter));
+    : photos.filter(p => p.damage_tag === damageTagFilter);
 
   const selectedJob = jobs.find(j => j.id === selectedJobId);
 
+  // ── Loading ───────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full min-h-[400px]">
@@ -172,36 +196,34 @@ export default function PhotosPage() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-5">
+
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <Camera className="w-6 h-6 text-blue-600" /> Photo Library
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">{photos.length} photo{photos.length !== 1 ? 's' : ''} · {selectedJob?.insured_name || 'No job selected'}</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {photos.length} photo{photos.length !== 1 ? 's' : ''} ·{' '}
+            {selectedJob ? `${selectedJob.insured_name} — ${selectedJob.property_address}` : 'No job selected'}
+          </p>
         </div>
         <button
+          type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={!selectedJobId || uploading}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition"
         >
           <Upload className="w-4 h-4" /> Upload Photos
         </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="hidden"
-          onChange={handleFileSelect}
-        />
+        <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
       </div>
 
       {/* Alerts */}
       {error && (
         <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-3">
           <AlertCircle className="w-4 h-4 shrink-0" />{error}
-          <button onClick={() => setError('')} className="ml-auto"><X className="w-4 h-4" /></button>
+          <button type="button" onClick={() => setError('')} className="ml-auto"><X className="w-4 h-4" /></button>
         </div>
       )}
       {success && (
@@ -210,13 +232,14 @@ export default function PhotosPage() {
         </div>
       )}
 
-      {/* Job Selector + Tag Filter */}
-      <div className="flex flex-wrap gap-3">
+      {/* Job Selector + Filter Bar */}
+      <div className="flex flex-wrap gap-3 items-center">
+        {/* Job selector */}
         <div className="relative">
           <select
             value={selectedJobId}
             onChange={e => setSelectedJobId(e.target.value)}
-            className="appearance-none pl-3 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+            className="appearance-none pl-3 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white min-w-[240px]"
           >
             {jobs.length === 0 && <option value="">No jobs yet</option>}
             {jobs.map(j => (
@@ -225,19 +248,27 @@ export default function PhotosPage() {
           </select>
           <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
         </div>
+
+        {/* Damage tag filter */}
         <div className="flex items-center gap-2 flex-wrap">
           <Filter className="w-4 h-4 text-gray-400" />
-          {['all', ...TAG_OPTIONS].map(tag => (
-            <button
-              key={tag}
-              onClick={() => setTagFilter(tag)}
-              className={`text-xs px-3 py-1.5 rounded-full border font-medium transition ${
-                tagFilter === tag
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
-              }`}
-            >
-              {tag === 'all' ? 'All' : tag}
+          <button type="button"
+            onClick={() => setDamageTagFilter('all')}
+            className={`text-xs px-3 py-1.5 rounded-full border font-medium transition ${damageTagFilter === 'all' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'}`}>
+            All
+          </button>
+          {DAMAGE_TAG_OPTIONS.map(opt => (
+            <button type="button" key={opt.value}
+              onClick={() => setDamageTagFilter(opt.value)}
+              className={`text-xs px-3 py-1.5 rounded-full border font-medium transition ${damageTagFilter === opt.value ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'}`}>
+              {opt.label}
+            </button>
+          ))}
+          {ROOM_TAG_OPTIONS.map(tag => (
+            <button type="button" key={tag}
+              onClick={() => setDamageTagFilter(tag)}
+              className={`text-xs px-3 py-1.5 rounded-full border font-medium transition ${damageTagFilter === tag ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'}`}>
+              {tag}
             </button>
           ))}
         </div>
@@ -250,36 +281,50 @@ export default function PhotosPage() {
             Ready to upload — {pendingFiles.length} file{pendingFiles.length > 1 ? 's' : ''}
           </h3>
 
-          {/* Tag selector */}
-          <div>
-            <p className="text-xs text-gray-500 mb-2">Tags (select all that apply):</p>
-            <div className="flex flex-wrap gap-2">
-              {TAG_OPTIONS.map(tag => (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() => toggleUploadTag(tag)}
-                  className={`text-xs px-3 py-1.5 rounded-full border font-medium transition ${
-                    uploadTags.includes(tag)
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-gray-50 text-gray-600 border-gray-300 hover:border-blue-400'
-                  }`}
-                >
-                  {tag}
-                </button>
-              ))}
+          {/* Tag selectors */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs font-medium text-gray-600 mb-2">Damage Type (optional):</p>
+              <div className="flex flex-wrap gap-2">
+                {DAMAGE_TAG_OPTIONS.map(opt => (
+                  <button type="button" key={opt.value}
+                    onClick={() => setUploadDamageTag(uploadDamageTag === opt.value ? '' : opt.value)}
+                    className={`text-xs px-3 py-1.5 rounded-full border font-medium transition ${
+                      uploadDamageTag === opt.value
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-gray-50 text-gray-600 border-gray-300 hover:border-blue-400'
+                    }`}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-gray-600 mb-2">Room / Area (optional):</p>
+              <div className="flex flex-wrap gap-2">
+                {ROOM_TAG_OPTIONS.map(tag => (
+                  <button type="button" key={tag}
+                    onClick={() => setUploadRoomTag(uploadRoomTag === tag ? '' : tag)}
+                    className={`text-xs px-3 py-1.5 rounded-full border font-medium transition ${
+                      uploadRoomTag === tag
+                        ? 'bg-purple-600 text-white border-purple-600'
+                        : 'bg-gray-50 text-gray-600 border-gray-300 hover:border-purple-400'
+                    }`}>
+                    {tag}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* Thumbnails */}
+          {/* Thumbnails preview */}
           <div className="flex gap-2 flex-wrap">
             {pendingFiles.map((f, i) => (
               <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden border border-gray-200">
                 <img src={URL.createObjectURL(f)} alt={f.name} className="w-full h-full object-cover" />
-                <button
+                <button type="button"
                   onClick={() => setPendingFiles(prev => prev.filter((_, idx) => idx !== i))}
-                  className="absolute top-0.5 right-0.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center"
-                >
+                  className="absolute top-0.5 right-0.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
                   <X className="w-2.5 h-2.5 text-white" />
                 </button>
               </div>
@@ -299,19 +344,13 @@ export default function PhotosPage() {
           )}
 
           <div className="flex gap-2">
-            <button
-              onClick={handleUpload}
-              disabled={uploading}
-              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
-            >
+            <button type="button" onClick={handleUpload} disabled={uploading}
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
               {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
               {uploading ? 'Uploading…' : 'Upload Now'}
             </button>
-            <button
-              onClick={() => setPendingFiles([])}
-              disabled={uploading}
-              className="text-sm text-gray-500 hover:text-gray-700 px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition"
-            >
+            <button type="button" onClick={() => setPendingFiles([])} disabled={uploading}
+              className="text-sm text-gray-500 hover:text-gray-700 px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition">
               Cancel
             </button>
           </div>
@@ -323,7 +362,11 @@ export default function PhotosPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
           <ImageIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
           <p className="text-gray-500 font-medium">
-            {jobs.length === 0 ? 'Create a job first to upload photos.' : tagFilter !== 'all' ? `No "${tagFilter}" photos yet.` : 'No photos yet — click Upload Photos to add some.'}
+            {jobs.length === 0
+              ? 'Create a job first to upload photos.'
+              : damageTagFilter !== 'all'
+              ? `No "${DAMAGE_TAG_OPTIONS.find(o=>o.value===damageTagFilter)?.label || damageTagFilter}" photos yet.`
+              : 'No photos yet — click Upload Photos to add some.'}
           </p>
         </div>
       ) : (
@@ -331,53 +374,41 @@ export default function PhotosPage() {
           {filteredPhotos.map(photo => (
             <div key={photo.id} className="group relative bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition">
               {/* Thumbnail */}
-              <div
-                className="aspect-square cursor-pointer overflow-hidden"
-                onClick={() => setLightbox(photo)}
-              >
+              <div className="aspect-square cursor-pointer overflow-hidden" onClick={() => setLightbox(photo)}>
                 <img
                   src={photo.photo_url}
                   alt="Damage photo"
                   className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                  onError={e => { (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="%23f3f4f6"/><text x="50" y="55" text-anchor="middle" fill="%239ca3af" font-size="12">No preview</text></svg>'; }}
+                  onError={e => {
+                    (e.target as HTMLImageElement).src =
+                      'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="%23f3f4f6"/><text x="50" y="55" text-anchor="middle" fill="%239ca3af" font-size="12">No preview</text></svg>';
+                  }}
                 />
               </div>
-              {/* Overlay actions */}
+              {/* Hover actions */}
               <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition">
-                <button
-                  onClick={() => setLightbox(photo)}
-                  className="w-7 h-7 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center"
-                >
+                <button type="button" onClick={() => setLightbox(photo)}
+                  className="w-7 h-7 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center">
                   <ZoomIn className="w-3.5 h-3.5 text-white" />
                 </button>
-                <button
-                  onClick={() => handleDelete(photo)}
-                  className="w-7 h-7 bg-red-500/80 hover:bg-red-600 rounded-full flex items-center justify-center"
-                >
+                <button type="button" onClick={() => handleDelete(photo)}
+                  className="w-7 h-7 bg-red-500/80 hover:bg-red-600 rounded-full flex items-center justify-center">
                   <Trash2 className="w-3.5 h-3.5 text-white" />
                 </button>
               </div>
-              {/* Tags */}
-              {photo.tags && photo.tags.length > 0 && (
-                <div className="absolute bottom-1.5 left-1.5 flex gap-1 flex-wrap max-w-[calc(100%-12px)]">
-                  {photo.tags.slice(0, 2).map(tag => (
-                    <span key={tag} className="text-[9px] font-semibold bg-black/60 text-white px-1.5 py-0.5 rounded-full">
-                      {tag}
-                    </span>
-                  ))}
-                  {photo.tags.length > 2 && (
-                    <span className="text-[9px] font-semibold bg-black/60 text-white px-1.5 py-0.5 rounded-full">
-                      +{photo.tags.length - 2}
-                    </span>
-                  )}
-                </div>
-              )}
-              {/* AI badge */}
-              {photo.ai_analysis?.severity && (
-                <div className={`absolute top-1.5 left-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${SEVERITY_COLORS[photo.ai_analysis.severity] || 'bg-gray-100 text-gray-600'}`}>
-                  {photo.ai_analysis.severity.toUpperCase()}
-                </div>
-              )}
+              {/* Tag badges */}
+              <div className="absolute bottom-1.5 left-1.5 flex gap-1 flex-wrap max-w-[calc(100%-12px)]">
+                {photo.damage_tag && (
+                  <span className="text-[9px] font-semibold bg-blue-600/80 text-white px-1.5 py-0.5 rounded-full">
+                    {damageTagLabel(photo.damage_tag)}
+                  </span>
+                )}
+                {photo.room_tag && (
+                  <span className="text-[9px] font-semibold bg-purple-600/80 text-white px-1.5 py-0.5 rounded-full">
+                    {photo.room_tag}
+                  </span>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -385,103 +416,87 @@ export default function PhotosPage() {
 
       {/* Lightbox */}
       {lightbox && (
-        <div
-          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
-          onClick={() => setLightbox(null)}
-        >
-          <div
-            className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-auto shadow-2xl"
-            onClick={e => e.stopPropagation()}
-          >
+        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setLightbox(null)}>
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-auto shadow-2xl"
+            onClick={e => e.stopPropagation()}>
+            {/* Header */}
             <div className="flex items-center justify-between p-4 border-b">
               <div className="flex items-center gap-2 flex-wrap">
-                {lightbox.tags?.map(tag => (
-                  <span key={tag} className="text-xs font-medium bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
-                    <Tag className="w-3 h-3 inline mr-1" />{tag}
+                {lightbox.damage_tag && (
+                  <span className="text-xs font-medium bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <Tag className="w-3 h-3" />{damageTagLabel(lightbox.damage_tag)}
                   </span>
-                ))}
+                )}
+                {lightbox.room_tag && (
+                  <span className="text-xs font-medium bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <Tag className="w-3 h-3" />{lightbox.room_tag}
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-2">
-                <a
-                  href={lightbox.photo_url}
-                  download
-                  target="_blank"
-                  rel="noreferrer"
-                  className="p-2 hover:bg-gray-100 rounded-lg transition"
-                  onClick={e => e.stopPropagation()}
-                >
+                <a href={lightbox.photo_url} download target="_blank" rel="noreferrer"
+                  className="p-2 hover:bg-gray-100 rounded-lg transition" onClick={e => e.stopPropagation()}>
                   <Download className="w-4 h-4 text-gray-600" />
                 </a>
-                <button
-                  onClick={() => { handleDelete(lightbox); }}
-                  className="p-2 hover:bg-red-50 rounded-lg transition"
-                >
+                <button type="button" onClick={() => { handleDelete(lightbox); }}
+                  className="p-2 hover:bg-red-50 rounded-lg transition">
                   <Trash2 className="w-4 h-4 text-red-500" />
                 </button>
-                <button onClick={() => setLightbox(null)} className="p-2 hover:bg-gray-100 rounded-lg transition">
+                <button type="button" onClick={() => setLightbox(null)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition">
                   <X className="w-4 h-4 text-gray-600" />
                 </button>
               </div>
             </div>
+
+            {/* Body */}
             <div className="grid grid-cols-1 md:grid-cols-2">
-              {/* Photo */}
+              {/* Full photo */}
               <div className="bg-gray-900 flex items-center justify-center min-h-[300px]">
-                <img
-                  src={lightbox.photo_url}
-                  alt="Full size"
-                  className="max-w-full max-h-[60vh] object-contain"
-                />
+                <img src={lightbox.photo_url} alt="Full size"
+                  className="max-w-full max-h-[60vh] object-contain" />
               </div>
-              {/* Details */}
+              {/* Details panel */}
               <div className="p-5 space-y-4">
                 <div>
-                  <p className="text-xs text-gray-400 mb-1">Uploaded</p>
-                  <p className="text-sm text-gray-700">{new Date(lightbox.created_at).toLocaleString()}</p>
+                  <p className="text-xs text-gray-400 mb-1 flex items-center gap-1">
+                    <Clock className="w-3 h-3" /> Uploaded
+                  </p>
+                  <p className="text-sm text-gray-700">{new Date(lightbox.timestamp).toLocaleString()}</p>
                 </div>
-                {lightbox.ai_analysis ? (
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-1">
-                      ✨ AI Analysis
-                    </h3>
-                    {lightbox.ai_analysis.description && (
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Description</p>
-                        <p className="text-sm text-gray-700">{lightbox.ai_analysis.description}</p>
-                      </div>
-                    )}
-                    {lightbox.ai_analysis.damage_type && (
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Damage Type</p>
-                        <p className="text-sm font-medium text-gray-800">{lightbox.ai_analysis.damage_type}</p>
-                      </div>
-                    )}
-                    {lightbox.ai_analysis.severity && (
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Severity</p>
-                        <span className={`text-xs font-bold px-2 py-1 rounded-full ${SEVERITY_COLORS[lightbox.ai_analysis.severity]}`}>
-                          {lightbox.ai_analysis.severity.toUpperCase()}
-                        </span>
-                      </div>
-                    )}
-                    {lightbox.ai_analysis.xactimate_codes && lightbox.ai_analysis.xactimate_codes.length > 0 && (
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Xactimate Codes</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {lightbox.ai_analysis.xactimate_codes.map(code => (
-                            <span key={code} className="text-xs font-mono bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">
-                              {code}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="bg-gray-50 rounded-lg p-4 text-center text-sm text-gray-500">
-                    <p className="mb-1">✨ AI analysis not yet run</p>
-                    <p className="text-xs">AI photo analysis coming in next update</p>
+                {lightbox.area && (
+                  <div>
+                    <p className="text-xs text-gray-400 mb-1 flex items-center gap-1">
+                      <MapPin className="w-3 h-3" /> Area
+                    </p>
+                    <p className="text-sm text-gray-700">{lightbox.area}</p>
                   </div>
                 )}
+                {lightbox.floor && (
+                  <div>
+                    <p className="text-xs text-gray-400 mb-1">Floor</p>
+                    <p className="text-sm text-gray-700">{lightbox.floor}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-xs text-gray-400 mb-2">Tags</p>
+                  <div className="flex flex-wrap gap-2">
+                    {lightbox.damage_tag && (
+                      <span className="text-xs bg-blue-50 text-blue-700 font-medium px-2.5 py-1 rounded-full">
+                        💧 {damageTagLabel(lightbox.damage_tag)}
+                      </span>
+                    )}
+                    {lightbox.room_tag && (
+                      <span className="text-xs bg-purple-50 text-purple-700 font-medium px-2.5 py-1 rounded-full">
+                        🏠 {lightbox.room_tag}
+                      </span>
+                    )}
+                    {!lightbox.damage_tag && !lightbox.room_tag && (
+                      <span className="text-xs text-gray-400 italic">No tags</span>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
