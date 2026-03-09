@@ -81,3 +81,22 @@
 - Keep MVP simple — get the workflow solid first
 - Priority: Job detail page fields → Documents → Share portal
 - Mobile comes after desktop is stable
+
+---
+
+## 🎯 Competitive Reference: Encircle
+- Industry standard used by major restoration companies
+- Key advantages to match or beat:
+  - Policyholder portal (client signs docs online)
+  - Field app (offline capable)
+  - Xactimate / XactAnalysis integration
+  - Sketch floor plan tool
+  - Contents inventory with pricing
+  - Insurance carrier direct submission
+
+## 💡 RoomLens Competitive Advantages to Build:
+  - AI-powered damage notes (already built ✅)
+  - Faster job creation workflow
+  - Better mobile UX
+  - Lower price point for smaller contractors
+  - Canadian-first (metric, CAD currency, province fields)

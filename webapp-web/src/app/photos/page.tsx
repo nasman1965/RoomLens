@@ -49,10 +49,32 @@ function damageTagLabel(val: string | null) {
 
 function extractStoragePath(url: string): string | null {
   try {
-    const marker = '/damage-photos/';
-    const idx = url.indexOf(marker);
-    if (idx === -1) return null;
-    return decodeURIComponent(url.slice(idx + marker.length).split('?')[0]);
+    // Handle multiple Supabase storage URL formats:
+    // 1. Public:        .../object/public/damage-photos/PATH
+    // 2. Authenticated: .../object/authenticated/damage-photos/PATH
+    // 3. Signed:        .../object/sign/damage-photos/PATH?token=...
+    // 4. Direct bucket: .../damage-photos/PATH
+    const patterns = [
+      /\/object\/(?:public|authenticated|sign)\/damage-photos\/(.+?)(?:\?|$)/,
+      /\/damage-photos\/(.+?)(?:\?|$)/,
+    ];
+    for (const re of patterns) {
+      const m = url.match(re);
+      if (m) return decodeURIComponent(m[1]);
+    }
+    return null;
+  } catch { return null; }
+}
+
+// Refresh a signed URL for a photo on-demand (called on img onError)
+async function refreshSignedUrl(photo_url: string): Promise<string | null> {
+  try {
+    const path = extractStoragePath(photo_url);
+    if (!path) return null;
+    const { data } = await supabase.storage
+      .from('damage-photos')
+      .createSignedUrl(path, 3600);
+    return data?.signedUrl || null;
   } catch { return null; }
 }
 
@@ -624,7 +646,15 @@ export default function PhotosPage() {
             <div className="grid grid-cols-1 md:grid-cols-2">
               <div className="bg-gray-900 flex items-center justify-center min-h-[300px]">
                 <img src={lightbox.signedUrl || lightbox.photo_url} alt="Full size"
-                  className="max-w-full max-h-[60vh] object-contain" />
+                  className="max-w-full max-h-[60vh] object-contain"
+                  onError={async e => {
+                    const img = e.target as HTMLImageElement;
+                    if (img.dataset.retried) return;
+                    img.dataset.retried = '1';
+                    const fresh = await refreshSignedUrl(lightbox.photo_url);
+                    if (fresh) img.src = fresh;
+                  }}
+                />
               </div>
               <div className="p-5 space-y-4">
                 <div>
@@ -716,9 +746,24 @@ function PhotoCard({
           src={photo.signedUrl || photo.photo_url}
           alt="Damage photo"
           className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-          onError={e => {
-            (e.target as HTMLImageElement).src =
-              'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="%23f3f4f6"/><text x="50" y="55" text-anchor="middle" fill="%239ca3af" font-size="11">No preview</text></svg>';
+          onError={async e => {
+            const img = e.target as HTMLImageElement;
+            // Prevent infinite retry loop
+            if (img.dataset.retried) return;
+            img.dataset.retried = '1';
+            // Try to refresh the signed URL
+            const fresh = await refreshSignedUrl(photo.photo_url);
+            if (fresh) {
+              img.src = fresh;
+            } else {
+              img.src = 'data:image/svg+xml,' + encodeURIComponent(
+                '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">' +
+                '<rect width="100" height="100" fill="#f3f4f6"/>' +
+                '<text x="50" y="45" text-anchor="middle" fill="#9ca3af" font-size="10">📷</text>' +
+                '<text x="50" y="62" text-anchor="middle" fill="#9ca3af" font-size="9">Loading...</text>' +
+                '</svg>'
+              );
+            }
           }}
         />
       </div>
