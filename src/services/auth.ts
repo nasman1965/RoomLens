@@ -1,158 +1,107 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Auth service — Firebase Email/Password
-// Replaces previous Supabase auth service
+// Auth service — Supabase Email/Password
+// Connects to the same Supabase project as the web app
 // ─────────────────────────────────────────────────────────────────────────────
 
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  sendPasswordResetEmail,
-  signOut as firebaseSignOut,
-  onAuthStateChanged,
-  updateProfile,
-  type User as FirebaseUser,
-} from 'firebase/auth';
-import {
-  doc,
-  setDoc,
-  getDoc,
-  serverTimestamp,
-} from 'firebase/firestore';
-import { auth, db } from './firebase';
+import { supabase } from './supabase';
 import type { User } from '../types';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-/** Map a Firebase user + Firestore profile into our internal User type */
-async function buildUser(firebaseUser: FirebaseUser): Promise<User | null> {
-  try {
-    const snap = await getDoc(doc(db, 'users', firebaseUser.uid));
-    const profile = snap.data() as Partial<User> | undefined;
-    return {
-      id:                firebaseUser.uid,
-      email:             firebaseUser.email ?? '',
-      company_name:      profile?.company_name ?? '',
-      subscription_tier: profile?.subscription_tier ?? 'free',
-      created_at:        profile?.created_at ?? new Date().toISOString(),
-    };
-  } catch {
-    return null;
-  }
+function friendlyError(msg: string): string {
+  if (msg.includes('Invalid login credentials'))  return 'Incorrect email or password.';
+  if (msg.includes('Email not confirmed'))         return 'Please confirm your email first.';
+  if (msg.includes('User already registered'))     return 'An account with this email already exists.';
+  if (msg.includes('Password should be'))          return 'Password must be at least 6 characters.';
+  if (msg.includes('Unable to validate'))          return 'Network error. Check your connection.';
+  if (msg.includes('rate limit'))                  return 'Too many attempts. Please try again later.';
+  return msg;
+}
+
+function buildUser(supabaseUser: any): User {
+  return {
+    id:                supabaseUser.id,
+    email:             supabaseUser.email ?? '',
+    company_name:      supabaseUser.user_metadata?.company_name ?? '',
+    subscription_tier: 'free',
+    created_at:        supabaseUser.created_at ?? new Date().toISOString(),
+  };
 }
 
 // ── authService ───────────────────────────────────────────────────────────────
 
 export const authService = {
-  /**
-   * Create a new account.
-   * Writes the user profile to Firestore users/{uid}.
-   */
+  /** Sign in with email + password */
+  async signIn(
+    email: string,
+    password: string,
+  ): Promise<{ user: User | null; error: string | null }> {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) return { user: null, error: friendlyError(error.message) };
+      if (!data.user) return { user: null, error: 'Sign-in failed' };
+      return { user: buildUser(data.user), error: null };
+    } catch (err: any) {
+      return { user: null, error: friendlyError(err?.message ?? 'Sign-in failed') };
+    }
+  },
+
+  /** Create a new account */
   async signUp(
     email: string,
     password: string,
     companyName: string,
   ): Promise<{ user: User | null; error: string | null }> {
     try {
-      const cred = await createUserWithEmailAndPassword(auth, email, password);
-      const { user: fbUser } = cred;
-
-      // Persist display name
-      await updateProfile(fbUser, { displayName: companyName });
-
-      // Write profile doc to Firestore
-      const profile: User = {
-        id:                fbUser.uid,
-        email:             email.toLowerCase().trim(),
-        company_name:      companyName.trim(),
-        subscription_tier: 'free',
-        created_at:        new Date().toISOString(),
-      };
-      await setDoc(doc(db, 'users', fbUser.uid), {
-        ...profile,
-        created_at: serverTimestamp(),
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { company_name: companyName } },
       });
-
-      return { user: profile, error: null };
+      if (error) return { user: null, error: friendlyError(error.message) };
+      if (!data.user) return { user: null, error: 'Sign-up failed' };
+      return { user: buildUser(data.user), error: null };
     } catch (err: any) {
-      const msg = (err?.message as string) ?? 'Sign-up failed';
-      return { user: null, error: friendlyError(msg) };
-    }
-  },
-
-  /**
-   * Sign in with email + password.
-   * Fetches the Firestore profile and returns a User object.
-   */
-  async signIn(
-    email: string,
-    password: string,
-  ): Promise<{ user: User | null; error: string | null }> {
-    try {
-      const cred = await signInWithEmailAndPassword(auth, email, password);
-      const user = await buildUser(cred.user);
-      return { user, error: user ? null : 'Profile not found' };
-    } catch (err: any) {
-      return { user: null, error: friendlyError(err?.message ?? 'Sign-in failed') };
+      return { user: null, error: friendlyError(err?.message ?? 'Sign-up failed') };
     }
   },
 
   /** Send password-reset email */
-  async resetPassword(
-    email: string,
-  ): Promise<{ error: string | null }> {
+  async resetPassword(email: string): Promise<{ error: string | null }> {
     try {
-      await sendPasswordResetEmail(auth, email);
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      if (error) return { error: friendlyError(error.message) };
       return { error: null };
     } catch (err: any) {
       return { error: friendlyError(err?.message ?? 'Reset failed') };
     }
   },
 
-  /** Return the currently logged-in Firebase user (or null) */
-  getCurrentFirebaseUser(): FirebaseUser | null {
-    return auth.currentUser;
-  },
-
-  /** Fetch the Firestore profile for the current user */
+  /** Get the currently logged-in user */
   async getCurrentUser(): Promise<User | null> {
-    const fbUser = auth.currentUser;
-    if (!fbUser) return null;
-    return buildUser(fbUser);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      return buildUser(user);
+    } catch {
+      return null;
+    }
   },
 
   /** Sign out */
   async signOut(): Promise<void> {
-    await firebaseSignOut(auth);
+    await supabase.auth.signOut();
   },
 
-  /**
-   * Listen for auth state changes.
-   * Returns the unsubscribe function.
-   */
-  onAuthStateChange(
-    callback: (user: User | null) => void,
-  ): () => void {
-    return onAuthStateChanged(auth, async (fbUser) => {
-      if (!fbUser) {
+  /** Listen for auth state changes — returns unsubscribe function */
+  onAuthStateChange(callback: (user: User | null) => void): () => void {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        callback(buildUser(session.user));
+      } else {
         callback(null);
-        return;
       }
-      const user = await buildUser(fbUser);
-      callback(user);
     });
+    return () => subscription.unsubscribe();
   },
 };
-
-// ── error mapping ─────────────────────────────────────────────────────────────
-
-function friendlyError(msg: string): string {
-  if (msg.includes('email-already-in-use'))    return 'An account with this email already exists.';
-  if (msg.includes('user-not-found'))          return 'No account found with this email.';
-  if (msg.includes('wrong-password'))          return 'Incorrect password. Please try again.';
-  if (msg.includes('invalid-email'))           return 'Please enter a valid email address.';
-  if (msg.includes('weak-password'))           return 'Password must be at least 6 characters.';
-  if (msg.includes('too-many-requests'))       return 'Too many attempts. Please try again later.';
-  if (msg.includes('network-request-failed'))  return 'Network error. Check your connection.';
-  if (msg.includes('invalid-credential'))      return 'Incorrect email or password.';
-  return msg;
-}

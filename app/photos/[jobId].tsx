@@ -1,192 +1,209 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, StatusBar,
-  TouchableOpacity, Alert, Image, Modal, FlatList, ActivityIndicator,
-  Platform,
+  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  ActivityIndicator, Alert, Image, ScrollView,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { useAuthStore } from '../../src/store';
+import { photosService, Photo } from '../../src/services/photos';
+import { jobsService } from '../../src/services/jobs';
 import { Colors, FontSize, Spacing, Radius, Shadow } from '../../src/constants/theme';
-import { DamagePhoto, AIPhotoAnalysis, XactimateLineItem } from '../../src/types';
 
-// ─── Damage tag config ────────────────────────────────────────────────────────
-const DAMAGE_TAGS: Array<{ value: DamagePhoto['damage_tag']; label: string; color: string }> = [
-  { value: 'water',       label: 'Water Damage',    color: '#3b82f6' },
-  { value: 'fire',        label: 'Fire Damage',     color: '#ef4444' },
-  { value: 'mold',        label: 'Mold',            color: '#22c55e' },
-  { value: 'structural',  label: 'Structural',      color: '#8b5cf6' },
-  { value: 'pre_existing',label: 'Pre-existing',    color: '#94a3b8' },
+const DAMAGE_TAGS = [
+  { value: 'pre_existing', label: 'Before',       emoji: '📷' },
+  { value: 'water',        label: 'Water Damage',  emoji: '💧' },
+  { value: 'fire',         label: 'Fire Damage',   emoji: '🔥' },
+  { value: 'mold',         label: 'Mold',          emoji: '🟢' },
+  { value: 'structural',   label: 'Structural',    emoji: '🏗️' },
+  { value: 'evidence',     label: 'Evidence',      emoji: '🔍' },
 ];
 
-// ─── Fake AI analysis for UI demo ─────────────────────────────────────────────
-const fakeAIAnalysis = (damage: DamagePhoto['damage_tag']): AIPhotoAnalysis => ({
-  material_type: 'Drywall',
-  damage_type: damage === 'water' ? 'Water intrusion' : damage === 'fire' ? 'Char/soot' : 'Mold growth',
-  severity: 'moderate',
-  confidence: 0.87,
-  xactimate_line_items: [
-    { code: 'DRY-3', description: 'Drywall removal & disposal', unit: 'SF', estimated_quantity: 120, selected: true },
-    { code: 'INS-1', description: 'Insulation — blown in', unit: 'SF', estimated_quantity: 120, selected: true },
-    { code: 'P-DTX', description: 'Prime & paint — 2 coats', unit: 'SF', estimated_quantity: 120, selected: false },
-  ],
-});
+const DEFAULT_ROOMS = [
+  'Basement', 'Main Floor', 'Upper Floor', 'Kitchen',
+  'Bathroom', 'Bedroom', 'Living Room', 'Garage', 'Exterior',
+];
 
-// ─── Photo Tile ───────────────────────────────────────────────────────────────
-function PhotoTile({ photo, onPress }: { photo: DamagePhoto; onPress: () => void }) {
-  const tagInfo = DAMAGE_TAGS.find((t) => t.value === photo.damage_tag);
-  return (
-    <TouchableOpacity style={styles.photoTile} onPress={onPress} activeOpacity={0.85}>
-      <Image source={{ uri: photo.photo_url }} style={styles.photoImg} resizeMode="cover" />
-      <View style={styles.photoOverlay}>
-        {tagInfo && (
-          <View style={[styles.photoTag, { backgroundColor: tagInfo.color }]}>
-            <Text style={styles.photoTagText}>{tagInfo.label}</Text>
-          </View>
-        )}
-        {photo.ai_analysis_json ? (
-          <View style={styles.photoAiBadge}>
-            <Ionicons name="sparkles" size={10} color="#fff" />
-            <Text style={styles.photoAiText}>AI</Text>
-          </View>
-        ) : null}
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-// ─── Xactimate Line Item Row ──────────────────────────────────────────────────
-function LineItemRow({
-  item, onToggle,
-}: { item: XactimateLineItem; onToggle: () => void }) {
-  return (
-    <TouchableOpacity style={[styles.lineItemRow, item.selected && styles.lineItemSelected]} onPress={onToggle}>
-      <View style={[styles.lineItemCheck, item.selected && styles.lineItemCheckActive]}>
-        {item.selected && <Ionicons name="checkmark" size={12} color="#fff" />}
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.lineItemCode}>{item.code}</Text>
-        <Text style={styles.lineItemDesc}>{item.description}</Text>
-      </View>
-      <View style={styles.lineItemQty}>
-        <Text style={styles.lineItemQtyNum}>{item.estimated_quantity}</Text>
-        <Text style={styles.lineItemQtyUnit}>{item.unit}</Text>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-// ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function PhotosScreen() {
   const { jobId } = useLocalSearchParams<{ jobId: string }>();
   const router = useRouter();
+  const { user } = useAuthStore();
 
-  const [photos, setPhotos] = useState<DamagePhoto[]>([]);
-  const [selectedDamageTag, setSelectedDamageTag] = useState<DamagePhoto['damage_tag']>('water');
-  const [selectedPhoto, setSelectedPhoto] = useState<DamagePhoto | null>(null);
-  const [analysing, setAnalysing] = useState(false);
-  const [showDetail, setShowDetail] = useState(false);
+  const [photos, setPhotos]           = useState<Photo[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [uploading, setUploading]     = useState(false);
+  const [selectedRoom, setSelectedRoom] = useState('');
+  const [selectedDamage, setSelectedDamage] = useState('');
+  const [rooms, setRooms]             = useState<string[]>([]);
+  const [jobName, setJobName]         = useState('');
+  const [lightbox, setLightbox]       = useState<Photo | null>(null);
 
-  // ── Capture / Select photos ────────────────────────────────────────────────
-  const capturePhoto = async (source: 'camera' | 'library') => {
-    const launchFn = source === 'camera'
-      ? ImagePicker.launchCameraAsync
-      : ImagePicker.launchImageLibraryAsync;
+  const loadData = useCallback(async () => {
+    if (!jobId) return;
+    setLoading(true);
 
-    const { status } = await (source === 'camera'
-      ? ImagePicker.requestCameraPermissionsAsync()
-      : ImagePicker.requestMediaLibraryPermissionsAsync());
+    // Load job name
+    const { job } = await jobsService.getJob(jobId);
+    if (job) setJobName(job.insured_name || job.property_address);
 
+    // Load photos
+    const { photos: loaded } = await photosService.getPhotos(jobId);
+    setPhotos(loaded);
+
+    // Derive rooms from existing tags
+    const existingRooms = Array.from(
+      new Set(loaded.map(p => p.room_tag).filter(Boolean) as string[])
+    );
+    setRooms(existingRooms);
+    setLoading(false);
+  }, [jobId]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const pickAndUpload = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission Needed', `${source === 'camera' ? 'Camera' : 'Photo library'} access is required.`);
+      Alert.alert('Permission Required', 'Allow photo library access to upload photos.');
       return;
     }
 
-    const result = await launchFn({
+    const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
       quality: 0.85,
-      allowsMultipleSelection: source === 'library',
     });
 
-    if (!result.canceled && result.assets) {
-      const newPhotos: DamagePhoto[] = result.assets.map((asset) => ({
-        id: `p${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        job_id: jobId!,
-        photo_url: asset.uri,
-        damage_tag: selectedDamageTag,
-        timestamp: new Date().toISOString(),
-      }));
-      setPhotos((prev) => [...newPhotos, ...prev]);
+    if (result.canceled || !result.assets.length) return;
+
+    setUploading(true);
+    let uploaded = 0;
+
+    for (const asset of result.assets) {
+      const { photo, error } = await photosService.uploadPhoto(
+        jobId!,
+        user!.id,
+        asset.uri,
+        selectedRoom || undefined,
+        selectedDamage || undefined,
+      );
+      if (photo) {
+        setPhotos(prev => [photo, ...prev]);
+        if (selectedRoom && !rooms.includes(selectedRoom)) {
+          setRooms(prev => [...prev, selectedRoom]);
+        }
+        uploaded++;
+      } else {
+        Alert.alert('Upload Error', error ?? 'Failed to upload photo');
+      }
+    }
+
+    setUploading(false);
+    if (uploaded > 0) {
+      Alert.alert('✅ Done', `${uploaded} photo${uploaded > 1 ? 's' : ''} uploaded!`);
     }
   };
 
-  // ── Run AI analysis on a photo ─────────────────────────────────────────────
-  const runAIAnalysis = async (photo: DamagePhoto) => {
-    setAnalysing(true);
-    // Simulate API call to GPT-4o Vision (real: POST to AWS Lambda)
-    await new Promise((r) => setTimeout(r, 2000));
-    const analysis = fakeAIAnalysis(photo.damage_tag);
-    const updated = { ...photo, ai_analysis_json: analysis };
-    setPhotos((prev) => prev.map((p) => p.id === photo.id ? updated : p));
-    setSelectedPhoto(updated);
-    setAnalysing(false);
-  };
+  const takePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Allow camera access to take photos.');
+      return;
+    }
 
-  const toggleLineItem = (photo: DamagePhoto, index: number) => {
-    const analysis = photo.ai_analysis_json;
-    if (!analysis) return;
-    const updatedItems = analysis.xactimate_line_items.map((item, i) =>
-      i === index ? { ...item, selected: !item.selected } : item
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.9,
+    });
+
+    if (result.canceled || !result.assets[0]) return;
+
+    setUploading(true);
+    const { photo, error } = await photosService.uploadPhoto(
+      jobId!,
+      user!.id,
+      result.assets[0].uri,
+      selectedRoom || undefined,
+      selectedDamage || undefined,
     );
-    const updatedAnalysis = { ...analysis, xactimate_line_items: updatedItems };
-    const updatedPhoto = { ...photo, ai_analysis_json: updatedAnalysis };
-    setPhotos((prev) => prev.map((p) => p.id === photo.id ? updatedPhoto : p));
-    setSelectedPhoto(updatedPhoto);
+    setUploading(false);
+
+    if (photo) {
+      setPhotos(prev => [photo, ...prev]);
+      if (selectedRoom && !rooms.includes(selectedRoom)) {
+        setRooms(prev => [...prev, selectedRoom]);
+      }
+      Alert.alert('✅ Photo saved!', `Tagged: ${selectedRoom || 'Unassigned'}`);
+    } else {
+      Alert.alert('Error', error ?? 'Upload failed');
+    }
   };
 
-  const deletePhoto = (photoId: string) => {
-    Alert.alert('Delete Photo', 'Remove this photo?', [
+  const deletePhoto = async (photo: Photo) => {
+    Alert.alert('Delete Photo', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete', style: 'destructive',
-        onPress: () => {
-          setPhotos((prev) => prev.filter((p) => p.id !== photoId));
-          setShowDetail(false);
+        onPress: async () => {
+          await photosService.deletePhoto(photo);
+          setPhotos(prev => prev.filter(p => p.id !== photo.id));
+          if (lightbox?.id === photo.id) setLightbox(null);
         },
       },
     ]);
   };
 
-  const severityColor = (s?: string) => s === 'severe' ? Colors.error : s === 'moderate' ? Colors.warning : Colors.success;
+  if (loading) return (
+    <View style={styles.center}>
+      <ActivityIndicator size="large" color={Colors.navy} />
+    </View>
+  );
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
-
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={22} color={Colors.textPrimary} />
+          <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Damage Photos</Text>
-        <Text style={styles.headerCount}>{photos.length}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.title}>📸 Photos</Text>
+          <Text style={styles.subtitle}>{jobName} · {photos.length} photos</Text>
+        </View>
       </View>
 
-      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+      <ScrollView contentContainerStyle={styles.scroll}>
 
-        {/* Damage tag filter */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Damage Type</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              {DAMAGE_TAGS.map((tag) => (
+        {/* Tag Panel */}
+        <View style={styles.tagPanel}>
+          <Text style={styles.sectionLabel}>Damage Type</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+            <View style={styles.chipRow}>
+              {DAMAGE_TAGS.map(t => (
                 <TouchableOpacity
-                  key={tag.value}
-                  style={[styles.tagChip, selectedDamageTag === tag.value && { backgroundColor: tag.color, borderColor: tag.color }]}
-                  onPress={() => setSelectedDamageTag(tag.value)}
+                  key={t.value}
+                  style={[styles.chip, selectedDamage === t.value && styles.chipActive]}
+                  onPress={() => setSelectedDamage(selectedDamage === t.value ? '' : t.value)}
                 >
-                  <Text style={[styles.tagChipText, selectedDamageTag === tag.value && { color: '#fff' }]}>
-                    {tag.label}
+                  <Text style={[styles.chipText, selectedDamage === t.value && styles.chipTextActive]}>
+                    {t.emoji} {t.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+
+          <Text style={styles.sectionLabel}>Room</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.chipRow}>
+              {[...new Set([...DEFAULT_ROOMS, ...rooms])].map(r => (
+                <TouchableOpacity
+                  key={r}
+                  style={[styles.chip, selectedRoom === r && styles.chipRoomActive]}
+                  onPress={() => setSelectedRoom(selectedRoom === r ? '' : r)}
+                >
+                  <Text style={[styles.chipText, selectedRoom === r && styles.chipTextActive]}>
+                    🏠 {r}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -194,272 +211,135 @@ export default function PhotosScreen() {
           </ScrollView>
         </View>
 
-        {/* Capture buttons */}
-        <View style={styles.captureRow}>
-          <TouchableOpacity style={[styles.captureBtn, { backgroundColor: Colors.navy }]} onPress={() => capturePhoto('camera')} activeOpacity={0.85}>
-            <Ionicons name="camera" size={20} color="#fff" />
-            <Text style={styles.captureBtnText}>Camera</Text>
+        {/* Upload Buttons */}
+        <View style={styles.btnRow}>
+          <TouchableOpacity
+            style={[styles.btnPrimary, uploading && styles.btnDisabled]}
+            onPress={takePhoto}
+            disabled={uploading}
+            activeOpacity={0.8}
+          >
+            {uploading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Ionicons name="camera" size={20} color="#fff" />
+            )}
+            <Text style={styles.btnText}>{uploading ? 'Uploading…' : 'Take Photo'}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.captureBtn, { backgroundColor: Colors.navyLight }]} onPress={() => capturePhoto('library')} activeOpacity={0.85}>
-            <Ionicons name="images" size={20} color="#fff" />
-            <Text style={styles.captureBtnText}>Library</Text>
+
+          <TouchableOpacity
+            style={[styles.btnSecondary, uploading && styles.btnDisabled]}
+            onPress={pickAndUpload}
+            disabled={uploading}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="images" size={20} color={Colors.navy} />
+            <Text style={styles.btnSecondaryText}>Gallery</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Photo grid */}
+        {/* Photos Grid */}
         {photos.length === 0 ? (
-          <View style={styles.emptyBox}>
+          <View style={styles.empty}>
             <Ionicons name="camera-outline" size={52} color={Colors.textMuted} />
             <Text style={styles.emptyTitle}>No photos yet</Text>
-            <Text style={styles.emptyText}>Select a damage type and tap Camera or Library to add photos</Text>
+            <Text style={styles.emptyText}>Take a photo or upload from gallery</Text>
           </View>
         ) : (
-          <View style={styles.photoGrid}>
-            {photos.map((photo) => (
-              <PhotoTile
+          <View style={styles.grid}>
+            {photos.map(photo => (
+              <TouchableOpacity
                 key={photo.id}
-                photo={photo}
-                onPress={() => { setSelectedPhoto(photo); setShowDetail(true); }}
-              />
+                style={styles.thumb}
+                onPress={() => setLightbox(photo)}
+                onLongPress={() => deletePhoto(photo)}
+                activeOpacity={0.85}
+              >
+                <Image
+                  source={{ uri: photo.signedUrl ?? photo.photo_url }}
+                  style={styles.thumbImage}
+                  resizeMode="cover"
+                />
+                {photo.room_tag ? (
+                  <View style={styles.thumbTag}>
+                    <Text style={styles.thumbTagText} numberOfLines={1}>{photo.room_tag}</Text>
+                  </View>
+                ) : null}
+                {photo.damage_tag ? (
+                  <View style={styles.thumbDmgTag}>
+                    <Text style={styles.thumbTagText}>
+                      {DAMAGE_TAGS.find(t => t.value === photo.damage_tag)?.emoji ?? '📷'}
+                    </Text>
+                  </View>
+                ) : null}
+              </TouchableOpacity>
             ))}
           </View>
         )}
-
-        {/* AI Batch Analyse button */}
-        {photos.filter((p) => !p.ai_analysis_json).length > 0 && (
-          <TouchableOpacity
-            style={styles.aiBtn}
-            onPress={() => {
-              const first = photos.find((p) => !p.ai_analysis_json);
-              if (first) { setSelectedPhoto(first); setShowDetail(true); }
-            }}
-            activeOpacity={0.9}
-          >
-            <Ionicons name="sparkles" size={20} color="#fff" />
-            <Text style={styles.aiBtnText}>
-              AI Analyse {photos.filter((p) => !p.ai_analysis_json).length} Photo{photos.filter((p) => !p.ai_analysis_json).length !== 1 ? 's' : ''}
-            </Text>
-          </TouchableOpacity>
-        )}
       </ScrollView>
 
-      {/* ── Photo Detail Modal ──────────────────────────────────────────────────── */}
-      <Modal
-        visible={showDetail && !!selectedPhoto}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowDetail(false)}
-      >
-        {selectedPhoto && (
-          <View style={styles.detailContainer}>
-            {/* Modal header */}
-            <View style={styles.detailHeader}>
-              <TouchableOpacity onPress={() => setShowDetail(false)} style={styles.backBtn}>
-                <Ionicons name="close" size={22} color={Colors.textPrimary} />
-              </TouchableOpacity>
-              <Text style={styles.detailHeaderTitle}>Photo Detail</Text>
-              <TouchableOpacity onPress={() => deletePhoto(selectedPhoto.id)} style={styles.deleteBtn}>
-                <Ionicons name="trash-outline" size={18} color={Colors.error} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView contentContainerStyle={{ paddingBottom: 50 }}>
-              {/* Image */}
-              <Image source={{ uri: selectedPhoto.photo_url }} style={styles.detailImage} resizeMode="cover" />
-
-              <View style={{ padding: Spacing.md }}>
-                {/* AI Analysis section */}
-                {!selectedPhoto.ai_analysis_json ? (
-                  <TouchableOpacity
-                    style={styles.runAiBtn}
-                    onPress={() => runAIAnalysis(selectedPhoto)}
-                    disabled={analysing}
-                  >
-                    {analysing ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <Ionicons name="sparkles" size={20} color="#fff" />
-                    )}
-                    <Text style={styles.runAiBtnText}>
-                      {analysing ? 'Analysing with GPT-4o Vision…' : 'Run AI Damage Analysis'}
-                    </Text>
-                  </TouchableOpacity>
-                ) : (
-                  <View>
-                    {/* Analysis result */}
-                    <View style={styles.analysisCard}>
-                      <View style={styles.analysisHeader}>
-                        <Ionicons name="sparkles" size={16} color={Colors.tileEstimate} />
-                        <Text style={styles.analysisTitle}>AI Analysis Result</Text>
-                        <View style={[styles.confidenceBadge]}>
-                          <Text style={styles.confidenceText}>
-                            {Math.round((selectedPhoto.ai_analysis_json.confidence ?? 0) * 100)}% confident
-                          </Text>
-                        </View>
-                      </View>
-
-                      <View style={styles.analysisRow}>
-                        <Text style={styles.analysisLabel}>Material:</Text>
-                        <Text style={styles.analysisValue}>{selectedPhoto.ai_analysis_json.material_type}</Text>
-                      </View>
-                      <View style={styles.analysisRow}>
-                        <Text style={styles.analysisLabel}>Damage:</Text>
-                        <Text style={styles.analysisValue}>{selectedPhoto.ai_analysis_json.damage_type}</Text>
-                      </View>
-                      <View style={styles.analysisRow}>
-                        <Text style={styles.analysisLabel}>Severity:</Text>
-                        <Text style={[styles.analysisValue, { color: severityColor(selectedPhoto.ai_analysis_json.severity), fontWeight: '700', textTransform: 'uppercase' }]}>
-                          {selectedPhoto.ai_analysis_json.severity}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* Xactimate line items */}
-                    <Text style={[styles.sectionTitle, { marginTop: Spacing.md, marginBottom: 8 }]}>
-                      Suggested Xactimate Items
-                    </Text>
-                    {selectedPhoto.ai_analysis_json.xactimate_line_items.map((item, i) => (
-                      <LineItemRow
-                        key={i}
-                        item={item}
-                        onToggle={() => toggleLineItem(selectedPhoto, i)}
-                      />
-                    ))}
-
-                    <TouchableOpacity style={styles.addToEstimateBtn}>
-                      <Ionicons name="add-circle-outline" size={18} color="#fff" />
-                      <Text style={styles.addToEstimateText}>
-                        Add {selectedPhoto.ai_analysis_json.xactimate_line_items.filter((i) => i.selected).length} Items to Estimate
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            </ScrollView>
+      {/* Lightbox */}
+      {lightbox ? (
+        <TouchableOpacity style={styles.lightbox} onPress={() => setLightbox(null)} activeOpacity={1}>
+          <Image
+            source={{ uri: lightbox.signedUrl ?? lightbox.photo_url }}
+            style={styles.lightboxImage}
+            resizeMode="contain"
+          />
+          <View style={styles.lightboxFooter}>
+            {lightbox.room_tag ? <Text style={styles.lightboxTag}>🏠 {lightbox.room_tag}</Text> : null}
+            {lightbox.damage_tag ? (
+              <Text style={styles.lightboxTag}>
+                {DAMAGE_TAGS.find(t => t.value === lightbox.damage_tag)?.emoji}{' '}
+                {DAMAGE_TAGS.find(t => t.value === lightbox.damage_tag)?.label}
+              </Text>
+            ) : null}
+            <TouchableOpacity onPress={() => deletePhoto(lightbox)} style={styles.lightboxDelete}>
+              <Ionicons name="trash" size={20} color="#fff" />
+              <Text style={styles.lightboxDeleteText}>Delete</Text>
+            </TouchableOpacity>
           </View>
-        )}
-      </Modal>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  header: {
-    paddingTop: Platform.OS === 'ios' ? 56 : 36,
-    paddingHorizontal: Spacing.md, paddingBottom: Spacing.sm,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: Colors.card, borderBottomWidth: 1, borderBottomColor: Colors.border,
-  },
-  backBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontSize: FontSize.lg, fontWeight: '800', color: Colors.textPrimary },
-  headerCount: {
-    width: 30, height: 30, borderRadius: 15, backgroundColor: Colors.red,
-    textAlign: 'center', lineHeight: 30, fontSize: FontSize.sm, fontWeight: '700', color: '#fff',
-  },
-  body: { flex: 1 },
-  bodyContent: { padding: Spacing.md, paddingBottom: 50 },
-  section: { marginBottom: Spacing.lg },
-  sectionTitle: { fontSize: FontSize.xs, fontWeight: '700', color: Colors.textPrimary, textTransform: 'uppercase', letterSpacing: 0.5 },
-
-  // Tags
-  tagChip: {
-    paddingHorizontal: 12, paddingVertical: 7, borderRadius: Radius.full,
-    borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.card,
-  },
-  tagChipText: { fontSize: FontSize.xs, fontWeight: '600', color: Colors.textSecondary },
-
-  // Capture
-  captureRow: { flexDirection: 'row', gap: 10, marginBottom: Spacing.md },
-  captureBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, padding: 14, borderRadius: Radius.md, ...Shadow.sm,
-  },
-  captureBtnText: { fontSize: FontSize.sm, fontWeight: '700', color: '#fff' },
-
-  // Photo grid
-  photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: Spacing.md },
-  photoTile: {
-    width: '31%', aspectRatio: 1, borderRadius: Radius.md, overflow: 'hidden',
-    ...Shadow.sm,
-  },
-  photoImg: { width: '100%', height: '100%' },
-  photoOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 4, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
-  photoTag: { borderRadius: 4, paddingHorizontal: 4, paddingVertical: 2 },
-  photoTagText: { fontSize: 8, fontWeight: '700', color: '#fff' },
-  photoAiBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 2,
-    backgroundColor: Colors.tileEstimate, borderRadius: 4, paddingHorizontal: 4, paddingVertical: 2,
-  },
-  photoAiText: { fontSize: 8, fontWeight: '700', color: '#fff' },
-
-  emptyBox: { alignItems: 'center', paddingTop: 60, paddingHorizontal: 40 },
-  emptyTitle: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.textPrimary, marginTop: 16 },
-  emptyText: { fontSize: FontSize.sm, color: Colors.textMuted, textAlign: 'center', marginTop: 8, lineHeight: 20 },
-
-  // AI button
-  aiBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 10, backgroundColor: Colors.tileEstimate, borderRadius: Radius.md,
-    paddingVertical: 14, marginTop: 8, ...Shadow.md,
-  },
-  aiBtnText: { fontSize: FontSize.md, fontWeight: '800', color: '#fff' },
-
-  // Detail modal
-  detailContainer: { flex: 1, backgroundColor: Colors.background },
-  detailHeader: {
-    paddingTop: Platform.OS === 'ios' ? 56 : 36,
-    paddingHorizontal: Spacing.md, paddingBottom: Spacing.sm,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: Colors.card, borderBottomWidth: 1, borderBottomColor: Colors.border,
-  },
-  detailHeaderTitle: { fontSize: FontSize.lg, fontWeight: '800', color: Colors.textPrimary },
-  deleteBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#fff0f1', justifyContent: 'center', alignItems: 'center' },
-  detailImage: { width: '100%', height: 260 },
-
-  // AI analysis
-  runAiBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 10, backgroundColor: Colors.tileEstimate, borderRadius: Radius.md,
-    paddingVertical: 14, ...Shadow.sm,
-  },
-  runAiBtnText: { fontSize: FontSize.sm, fontWeight: '700', color: '#fff' },
-  analysisCard: {
-    backgroundColor: Colors.card, borderRadius: Radius.md, padding: Spacing.md,
-    borderLeftWidth: 3, borderLeftColor: Colors.tileEstimate, ...Shadow.sm, marginBottom: Spacing.sm,
-  },
-  analysisHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
-  analysisTitle: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.textPrimary, flex: 1 },
-  confidenceBadge: {
-    backgroundColor: Colors.background, borderRadius: Radius.full,
-    paddingHorizontal: 8, paddingVertical: 3,
-  },
-  confidenceText: { fontSize: 10, fontWeight: '700', color: Colors.textSecondary },
-  analysisRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 },
-  analysisLabel: { fontSize: FontSize.xs, fontWeight: '700', color: Colors.textMuted, width: 65 },
-  analysisValue: { fontSize: FontSize.sm, color: Colors.textPrimary, flex: 1 },
-
-  // Line items
-  lineItemRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: Colors.card, borderRadius: Radius.sm,
-    padding: 10, marginBottom: 6, borderWidth: 1.5, borderColor: Colors.border,
-  },
-  lineItemSelected: { borderColor: Colors.success, backgroundColor: '#f0fdf4' },
-  lineItemCheck: {
-    width: 22, height: 22, borderRadius: 6, borderWidth: 2,
-    borderColor: Colors.border, justifyContent: 'center', alignItems: 'center',
-  },
-  lineItemCheckActive: { backgroundColor: Colors.success, borderColor: Colors.success },
-  lineItemCode: { fontSize: FontSize.xs, fontWeight: '700', color: Colors.textMuted },
-  lineItemDesc: { fontSize: FontSize.sm, color: Colors.textPrimary },
-  lineItemQty: { alignItems: 'center' },
-  lineItemQtyNum: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.textPrimary },
-  lineItemQtyUnit: { fontSize: 9, color: Colors.textMuted },
-  addToEstimateBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, backgroundColor: Colors.success, borderRadius: Radius.md,
-    paddingVertical: 13, marginTop: Spacing.sm, ...Shadow.sm,
-  },
-  addToEstimateText: { fontSize: FontSize.sm, fontWeight: '800', color: '#fff' },
+  container:       { flex: 1, backgroundColor: Colors.background },
+  center:          { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  header:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: 56, paddingBottom: Spacing.md, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: Colors.border },
+  backBtn:         { marginRight: Spacing.md },
+  title:           { fontSize: FontSize.lg, fontWeight: '700', color: Colors.textPrimary },
+  subtitle:        { fontSize: FontSize.xs, color: Colors.textMuted },
+  scroll:          { padding: Spacing.lg, paddingBottom: 40 },
+  tagPanel:        { backgroundColor: '#fff', borderRadius: Radius.lg, padding: Spacing.md, marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.border },
+  sectionLabel:    { fontSize: FontSize.xs, fontWeight: '700', color: Colors.textSecondary, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  chipRow:         { flexDirection: 'row', gap: 8, paddingRight: 8 },
+  chip:            { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: Colors.border, backgroundColor: '#f8f9fc' },
+  chipActive:      { backgroundColor: Colors.navy, borderColor: Colors.navy },
+  chipRoomActive:  { backgroundColor: '#7c3aed', borderColor: '#7c3aed' },
+  chipText:        { fontSize: 12, color: Colors.textSecondary, fontWeight: '500' },
+  chipTextActive:  { color: '#fff' },
+  btnRow:          { flexDirection: 'row', gap: 12, marginBottom: Spacing.lg },
+  btnPrimary:      { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.navy, borderRadius: Radius.md, paddingVertical: 14 },
+  btnSecondary:    { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#fff', borderRadius: Radius.md, paddingVertical: 14, borderWidth: 1, borderColor: Colors.border },
+  btnDisabled:     { opacity: 0.5 },
+  btnText:         { fontSize: FontSize.sm, fontWeight: '700', color: '#fff' },
+  btnSecondaryText: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.navy },
+  empty:           { alignItems: 'center', paddingVertical: 48 },
+  emptyTitle:      { fontSize: FontSize.lg, fontWeight: '600', color: Colors.textPrimary, marginTop: 12 },
+  emptyText:       { fontSize: FontSize.sm, color: Colors.textMuted, marginTop: 4 },
+  grid:            { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  thumb:           { width: '32.5%', aspectRatio: 1, borderRadius: Radius.sm, overflow: 'hidden', backgroundColor: '#e2e8f0' },
+  thumbImage:      { width: '100%', height: '100%' },
+  thumbTag:        { position: 'absolute', bottom: 2, left: 2, backgroundColor: 'rgba(124,58,237,0.85)', borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1, maxWidth: '90%' },
+  thumbDmgTag:     { position: 'absolute', top: 2, right: 2, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 4, padding: 2 },
+  thumbTagText:    { fontSize: 9, color: '#fff', fontWeight: '700' },
+  lightbox:        { position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center', alignItems: 'center' },
+  lightboxImage:   { width: '100%', height: '75%' },
+  lightboxFooter:  { position: 'absolute', bottom: 40, left: 20, right: 20, flexDirection: 'row', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
+  lightboxTag:     { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 , color: '#fff', fontSize: 13, fontWeight: '600' },
+  lightboxDelete:  { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#ef4444', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
+  lightboxDeleteText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 });

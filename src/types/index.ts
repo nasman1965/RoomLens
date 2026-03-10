@@ -13,13 +13,29 @@ export interface User {
 export interface Job {
   id: string;
   user_id: string;
+  // Core fields matching Supabase schema
+  insured_name: string;
   property_address: string;
-  gps_lat?: number;
-  gps_lng?: number;
-  job_type: JobType;
-  status: 'draft' | 'active' | 'pending' | 'complete';
-  notes?: string;
+  property_city?: string;
+  claim_number?: string;
+  insurer_name?: string;
+  job_type: string;
+  status: 'new' | 'dispatched' | 'active' | 'review' | 'closed' | 'stopped';
+  current_step: number;
+  lead_source?: string;
+  // Stop/Override system
+  stopped: boolean;
+  stop_reason?: string | null;
+  stop_notes?: string | null;
+  stopped_at?: string | null;
+  stopped_by?: string | null;
+  override_active: boolean;
+  override_reason?: string | null;
+  override_by?: string | null;
+  override_at?: string | null;
+  // Timestamps
   created_at: string;
+  updated_at?: string;
 }
 
 export interface Room {

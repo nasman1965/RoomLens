@@ -1,140 +1,139 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Jobs service — Firestore
-// Collection: jobs/{jobId}  (scoped per user via userId field)
+// Jobs service — Supabase
+// Reads/writes the same 'jobs' table as the web app
 // ─────────────────────────────────────────────────────────────────────────────
 
-import {
-  collection,
-  doc,
-  addDoc,
-  getDoc,
-  getDocs,
-  updateDoc,
-  deleteDoc,
-  query,
-  where,
-  orderBy,
-  serverTimestamp,
-  Timestamp,
-} from 'firebase/firestore';
-import { db } from './firebase';
-import { auth } from './firebase';
+import { supabase } from './supabase';
 import type { Job } from '../types';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-function assertAuth(): string {
-  const uid = auth.currentUser?.uid;
-  if (!uid) throw new Error('Not authenticated');
-  return uid;
-}
-
-/** Convert a Firestore doc snapshot to our Job type */
-function docToJob(id: string, data: Record<string, any>): Job {
+function rowToJob(row: any): Job {
   return {
-    id,
-    user_id:          data.user_id ?? '',
-    property_address: data.property_address ?? '',
-    gps_lat:          data.gps_lat ?? undefined,
-    gps_lng:          data.gps_lng ?? undefined,
-    job_type:         data.job_type ?? 'water_loss',
-    status:           data.status ?? 'draft',
-    notes:            data.notes ?? undefined,
-    created_at:       data.created_at instanceof Timestamp
-                        ? data.created_at.toDate().toISOString()
-                        : (data.created_at ?? new Date().toISOString()),
+    id:               row.id,
+    user_id:          row.user_id,
+    insured_name:     row.insured_name ?? '',
+    property_address: row.property_address ?? '',
+    property_city:    row.property_city ?? '',
+    claim_number:     row.claim_number ?? '',
+    insurer_name:     row.insurer_name ?? '',
+    job_type:         row.job_type ?? 'water_loss',
+    status:           row.status ?? 'new',
+    current_step:     row.current_step ?? 1,
+    lead_source:      row.lead_source ?? 'manual',
+    stopped:          row.stopped ?? false,
+    stop_reason:      row.stop_reason ?? null,
+    stop_notes:       row.stop_notes ?? null,
+    stopped_at:       row.stopped_at ?? null,
+    stopped_by:       row.stopped_by ?? null,
+    override_active:  row.override_active ?? false,
+    created_at:       row.created_at ?? new Date().toISOString(),
+    updated_at:       row.updated_at ?? new Date().toISOString(),
   };
 }
 
 // ── jobsService ───────────────────────────────────────────────────────────────
 
 export const jobsService = {
-  /** Create a new job for the current user */
-  async createJob(
-    jobData: Pick<Job, 'property_address' | 'job_type' | 'notes' | 'gps_lat' | 'gps_lng'>,
-  ): Promise<{ job: Job | null; error: string | null }> {
+  /** Fetch all jobs for the current user */
+  async getJobs(): Promise<{ jobs: Job[]; error: string | null }> {
     try {
-      const userId = assertAuth();
-      const payload = {
-        user_id:          userId,
-        property_address: jobData.property_address,
-        job_type:         jobData.job_type,
-        status:           'draft' as const,
-        notes:            jobData.notes ?? null,
-        gps_lat:          jobData.gps_lat ?? null,
-        gps_lng:          jobData.gps_lng ?? null,
-        created_at:       serverTimestamp(),
-      };
-      const ref  = await addDoc(collection(db, 'jobs'), payload);
-      const snap = await getDoc(ref);
-      const job  = docToJob(ref.id, snap.data() ?? {});
-      return { job, error: null };
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return { jobs: [], error: 'Not authenticated' };
+
+      const { data, error } = await supabase
+        .from('jobs')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) return { jobs: [], error: error.message };
+      return { jobs: (data ?? []).map(rowToJob), error: null };
+    } catch (err: any) {
+      return { jobs: [], error: err?.message ?? 'Failed to load jobs' };
+    }
+  },
+
+  /** Fetch a single job by ID */
+  async getJob(id: string): Promise<{ job: Job | null; error: string | null }> {
+    try {
+      const { data, error } = await supabase
+        .from('jobs')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) return { job: null, error: error.message };
+      return { job: rowToJob(data), error: null };
+    } catch (err: any) {
+      return { job: null, error: err?.message ?? 'Failed to load job' };
+    }
+  },
+
+  /** Create a new job */
+  async createJob(jobData: Partial<Job>): Promise<{ job: Job | null; error: string | null }> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return { job: null, error: 'Not authenticated' };
+
+      const { data, error } = await supabase
+        .from('jobs')
+        .insert({ ...jobData, user_id: user.id })
+        .select()
+        .single();
+
+      if (error) return { job: null, error: error.message };
+      return { job: rowToJob(data), error: null };
     } catch (err: any) {
       return { job: null, error: err?.message ?? 'Failed to create job' };
     }
   },
 
-  /** Get all jobs for the current user, sorted newest first */
-  async getJobs(): Promise<{ jobs: Job[]; error: string | null }> {
+  /** Update a job */
+  async updateJob(id: string, updates: Partial<Job>): Promise<{ error: string | null }> {
     try {
-      const userId = assertAuth();
-      const q = query(
-        collection(db, 'jobs'),
-        where('user_id', '==', userId),
-        orderBy('created_at', 'desc'),
-      );
-      const snap = await getDocs(q);
-      const jobs = snap.docs.map((d) => docToJob(d.id, d.data()));
-      return { jobs, error: null };
-    } catch (err: any) {
-      return { jobs: [], error: err?.message ?? 'Failed to fetch jobs' };
-    }
-  },
+      const { error } = await supabase
+        .from('jobs')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', id);
 
-  /** Get a single job by ID */
-  async getJob(jobId: string): Promise<{ job: Job | null; error: string | null }> {
-    try {
-      const snap = await getDoc(doc(db, 'jobs', jobId));
-      if (!snap.exists()) return { job: null, error: 'Job not found' };
-      return { job: docToJob(snap.id, snap.data()), error: null };
-    } catch (err: any) {
-      return { job: null, error: err?.message ?? 'Failed to fetch job' };
-    }
-  },
-
-  /** Update job status */
-  async updateJobStatus(
-    jobId: string,
-    status: Job['status'],
-  ): Promise<{ error: string | null }> {
-    try {
-      await updateDoc(doc(db, 'jobs', jobId), { status });
-      return { error: null };
-    } catch (err: any) {
-      return { error: err?.message ?? 'Failed to update status' };
-    }
-  },
-
-  /** Update any job fields */
-  async updateJob(
-    jobId: string,
-    updates: Partial<Omit<Job, 'id' | 'user_id' | 'created_at'>>,
-  ): Promise<{ error: string | null }> {
-    try {
-      await updateDoc(doc(db, 'jobs', jobId), updates as any);
+      if (error) return { error: error.message };
       return { error: null };
     } catch (err: any) {
       return { error: err?.message ?? 'Failed to update job' };
     }
   },
 
-  /** Delete a job */
-  async deleteJob(jobId: string): Promise<{ error: string | null }> {
-    try {
-      await deleteDoc(doc(db, 'jobs', jobId));
-      return { error: null };
-    } catch (err: any) {
-      return { error: err?.message ?? 'Failed to delete job' };
-    }
+  /** Stop a job */
+  async stopJob(
+    id: string,
+    reason: string,
+    notes: string,
+    stoppedBy: string,
+  ): Promise<{ error: string | null }> {
+    return jobsService.updateJob(id, {
+      stopped: true,
+      stop_reason: reason,
+      stop_notes: notes || null,
+      stopped_at: new Date().toISOString(),
+      stopped_by: stoppedBy,
+      status: 'stopped' as any,
+    });
+  },
+
+  /** Override (re-activate) a stopped job */
+  async overrideJob(
+    id: string,
+    reason: string,
+    overrideBy: string,
+  ): Promise<{ error: string | null }> {
+    return jobsService.updateJob(id, {
+      stopped: false,
+      override_active: true,
+      override_reason: reason,
+      override_by: overrideBy,
+      override_at: new Date().toISOString(),
+      status: 'active' as any,
+    });
   },
 };
