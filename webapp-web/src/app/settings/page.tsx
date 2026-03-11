@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import {
@@ -111,7 +111,7 @@ const INTEGRATIONS = [
 const input = 'w-full px-3 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition';
 
 // ═══════════════════════════════════════════════════════════════════════════════
-export default function SettingsPage() {
+function SettingsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<Tab>('profile');
@@ -822,5 +822,18 @@ function MemberCard({ m, onEdit, onToggle, onDelete }: {
         </button>
       </div>
     </div>
+  );
+}
+
+// ─── Suspense wrapper (required for useSearchParams in Next 14) ────────────────
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-slate-400">Loading settings...</div>
+      </div>
+    }>
+      <SettingsContent />
+    </Suspense>
   );
 }
