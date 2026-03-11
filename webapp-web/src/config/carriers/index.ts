@@ -4,6 +4,7 @@ import { avivaConfig }       from './aviva';
 import { desjardinConfig }   from './desjardins';
 import { cooperatorsConfig } from './cooperators';
 import { definityConfig }    from './definity';
+import { commonwellConfig }  from './commonwell';
 
 const otherConfig: CarrierProfile = {
   id: 'other', insurer_name: 'Other Carrier', carrier_slug: 'other',
@@ -20,7 +21,8 @@ const otherConfig: CarrierProfile = {
 
 export const CARRIER_CONFIGS: Record<CarrierSlug, CarrierProfile> = {
   intact: intactConfig, aviva: avivaConfig, desjardins: desjardinConfig,
-  cooperators: cooperatorsConfig, definity: definityConfig, other: otherConfig,
+  cooperators: cooperatorsConfig, definity: definityConfig,
+  commonwell: commonwellConfig, other: otherConfig,
 };
 
 export const ALL_CARRIERS: CarrierSelectOption[] = Object.values(CARRIER_CONFIGS).map(c => ({
@@ -35,4 +37,4 @@ export function getCarrierConfig(slug: CarrierSlug): CarrierProfile {
   return CARRIER_CONFIGS[slug] ?? CARRIER_CONFIGS['other'];
 }
 
-export { intactConfig, avivaConfig, desjardinConfig, cooperatorsConfig, definityConfig };
+export { intactConfig, avivaConfig, desjardinConfig, cooperatorsConfig, definityConfig, commonwellConfig };

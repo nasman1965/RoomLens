@@ -9,6 +9,7 @@ export type CarrierSlug =
   | 'desjardins'
   | 'cooperators'
   | 'definity'
+  | 'commonwell'
   | 'other';
 
 export type ExportFormat = 'ESX_XML' | 'CORELOGIC' | 'DRYBOOK' | 'INTERNAL';
@@ -122,6 +123,7 @@ export const CARRIER_COLORS: Record<CarrierSlug, string> = {
   desjardins:  '#009A44',
   cooperators: '#0066CC',
   definity:    '#FF6600',
+  commonwell:  '#1B4F8A',
   other:       '#64748b',
 };
 
@@ -131,5 +133,6 @@ export const CARRIER_NAMES: Record<CarrierSlug, string> = {
   desjardins:  'Desjardins General Insurance',
   cooperators: 'The Co-operators',
   definity:    'Definity Financial (Economical)',
+  commonwell:  'The Commonwell Mutual',
   other:       'Other Carrier',
 };
