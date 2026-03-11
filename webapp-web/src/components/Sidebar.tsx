@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import {
   LayoutDashboard, Briefcase, Camera, Map, Droplets,
-  FileText, Settings, LogOut, Building2, ChevronRight, Package, Users,
+  FileText, Settings, LogOut, Building2, ChevronRight, Package, Users, Shield,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -62,6 +62,15 @@ export default function Sidebar() {
           );
         })}
       </nav>
+
+      {/* Super Admin link — only visible if on super-admin path */}
+      <div className="px-3 pb-2">
+        <Link href="/super-admin"
+          className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-red-400 hover:bg-slate-800 rounded-lg transition text-xs">
+          <Shield className="w-3.5 h-3.5" />
+          <span className="font-medium">Super Admin</span>
+        </Link>
+      </div>
 
       {/* Sign Out */}
       <div className="px-3 py-4 border-t border-slate-700">
