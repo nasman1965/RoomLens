@@ -24,6 +24,7 @@ interface Job {
   job_type: string; status: string; current_step: number;
   adjuster_name: string | null; adjuster_email: string | null; adjuster_phone: string | null;
   notes: string | null; created_at: string; updated_at: string;
+  carrier_slug: string | null;
   // Step 1 - File Creation
   lead_source: string | null; lead_source_detail: string | null;
   created_by_name: string | null; created_by_phone: string | null; created_by_email: string | null;
@@ -244,7 +245,7 @@ export default function JobDetailPage() {
       setUserId(session.user.id);
 
       const [jobRes, stepsRes, docsRes, teamRes] = await Promise.all([
-        supabase.from('jobs').select('*').eq('id', id).eq('user_id', session.user.id).single(),
+        supabase.from('jobs').select('*, carrier_slug').eq('id', id).eq('user_id', session.user.id).single(),
         supabase.from('workflow_steps').select('*').eq('job_id', id).order('step_number'),
         supabase.from('documents').select('*').eq('job_id', id).order('created_at', { ascending: false }),
         supabase.from('team_members').select('*').eq('user_id', session.user.id)
@@ -786,6 +787,35 @@ export default function JobDetailPage() {
 
       {/* ── Workflow Progress Bar ── */}
       <WorkflowProgressBar steps={workflowSteps} currentStep={job.current_step} />
+
+      {/* ── Carrier Mode Banner ── */}
+      <Link
+        href={`/jobs/${job.id}/carrier`}
+        className={`flex items-center justify-between gap-3 rounded-xl border-2 p-4 transition hover:shadow-md ${
+          job.carrier_slug
+            ? 'bg-blue-50 border-blue-300 hover:bg-blue-100'
+            : 'bg-slate-50 border-dashed border-slate-300 hover:border-blue-400'
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+            job.carrier_slug ? 'bg-blue-600' : 'bg-slate-300'
+          }`}>
+            <Shield className={`w-5 h-5 ${job.carrier_slug ? 'text-white' : 'text-white'}`} />
+          </div>
+          <div>
+            <p className={`font-bold text-sm ${job.carrier_slug ? 'text-blue-800' : 'text-slate-700'}`}>
+              {job.carrier_slug ? '🛡️ Carrier Mode Active' : '🛡️ Activate Carrier Mode'}
+            </p>
+            <p className={`text-xs mt-0.5 ${job.carrier_slug ? 'text-blue-600' : 'text-slate-500'}`}>
+              {job.carrier_slug
+                ? `${job.insurer_name || job.carrier_slug} — SLA timers, photo labels & checklist`
+                : 'Select carrier for SLA timers, photo requirements & compliance checklist'}
+            </p>
+          </div>
+        </div>
+        <ChevronRight className={`w-5 h-5 flex-shrink-0 ${job.carrier_slug ? 'text-blue-400' : 'text-slate-400'}`} />
+      </Link>
 
       {/* ── Clickable Step Tabs ── */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">

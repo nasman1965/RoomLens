@@ -2,8 +2,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { ArrowLeft, Save, Loader2, AlertCircle, Zap } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, AlertCircle, Zap, Shield } from 'lucide-react';
 import Link from 'next/link';
+import { CarrierSelect } from '@/components/carriers/CarrierSelect';
+import { CarrierProfile, CarrierSlug } from '@/types/carriers';
 
 const WORKFLOW_STEPS = [
   'File Creation', 'Dispatch', 'Work Authorization', 'Day-1 Evidence',
@@ -32,6 +34,8 @@ export default function NewJobPage() {
   // File-creation metadata (auto-filled from user profile)
   const [creator, setCreator] = useState({ name: '', phone: '', email: '' });
 
+  const [selectedCarrier, setSelectedCarrier] = useState<CarrierProfile | null>(null);
+
   const [form, setForm] = useState({
     lead_source: 'phone',
     lead_source_detail: '',
@@ -52,6 +56,14 @@ export default function NewJobPage() {
     adjuster_phone: '',
     notes: '',
   });
+
+  const handleCarrierSelect = (profile: CarrierProfile) => {
+    setSelectedCarrier(profile);
+    // Auto-fill insurer name if not manually set
+    if (!form.insurer_name) {
+      update('insurer_name', profile.insurer_name);
+    }
+  };
 
   const update = (k: keyof typeof form, v: string) =>
     setForm(prev => ({ ...prev, [k]: v }));
@@ -107,6 +119,7 @@ export default function NewJobPage() {
           // Claim
           claim_number:         form.claim_number || null,
           insurer_name:         form.insurer_name || null,
+          carrier_slug:         selectedCarrier?.carrier_slug || null,
           loss_date:            form.loss_date || null,
           loss_category:        parseInt(form.loss_category),
           loss_class:           parseInt(form.loss_class),
@@ -261,6 +274,26 @@ export default function NewJobPage() {
                 placeholder="K1A 0A6" className={cls} />
             </div>
           </div>
+        </div>
+
+        {/* ── Insurance Carrier Mode ── */}
+        <div className="bg-slate-800 rounded-xl border border-slate-700 p-5">
+          <h2 className="text-base font-semibold text-slate-200 mb-1 flex items-center gap-2">
+            <Shield className="w-4 h-4 text-blue-400" /> Insurance Carrier
+          </h2>
+          <p className="text-xs text-slate-400 mb-4">
+            Select the carrier to load SLA timers, photo requirements &amp; carrier-specific checklist.
+          </p>
+          <CarrierSelect
+            onCarrierSelect={handleCarrierSelect}
+            defaultValue={selectedCarrier?.carrier_slug as CarrierSlug | undefined}
+          />
+          {selectedCarrier && (
+            <div className="mt-3 flex items-center gap-2 text-xs text-green-400 font-medium">
+              <span className="w-2 h-2 rounded-full bg-green-400" />
+              {selectedCarrier.insurer_name} — SLA timers will start automatically
+            </div>
+          )}
         </div>
 
         {/* ── Claim Details ── */}
