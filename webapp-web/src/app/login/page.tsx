@@ -109,9 +109,11 @@ function LoginContent() {
         }
         router.push('/super-admin');
       } else {
-        // Admin or Staff role → always go to dashboard (never redirect to super-admin)
-        const redirect = searchParams.get('redirect') || '/dashboard';
-        router.push(redirect);
+        // Admin or Staff role → always go to dashboard
+        // Never allow ?redirect to send non-superadmin users to /super-admin
+        const rawRedirect = searchParams.get('redirect') || '/dashboard';
+        const safeRedirect = rawRedirect.startsWith('/super-admin') ? '/dashboard' : rawRedirect;
+        router.push(safeRedirect);
       }
     } catch {
       setError('Sign in failed. Please try again.');
