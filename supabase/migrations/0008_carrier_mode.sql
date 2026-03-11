@@ -82,8 +82,8 @@ CREATE INDEX IF NOT EXISTS idx_sla_timers_status  ON carrier_sla_timers(status);
 
 ALTER TABLE carrier_sla_timers ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "rw_sla_timers"
-  ON carrier_sla_timers FOR ALL USING (true);
+DROP POLICY IF EXISTS "rw_sla_timers" ON carrier_sla_timers;
+CREATE POLICY "rw_sla_timers" ON carrier_sla_timers FOR ALL USING (true);
 
 -- ── 4. carrier_job_files ──────────────────────────────────────
 CREATE TABLE IF NOT EXISTS carrier_job_files (
@@ -105,8 +105,8 @@ CREATE INDEX IF NOT EXISTS idx_carrier_files_job_id ON carrier_job_files(job_id)
 
 ALTER TABLE carrier_job_files ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "rw_carrier_files"
-  ON carrier_job_files FOR ALL USING (true);
+DROP POLICY IF EXISTS "rw_carrier_files" ON carrier_job_files;
+CREATE POLICY "rw_carrier_files" ON carrier_job_files FOR ALL USING (true);
 
 -- ── 5. Seed: Intact Insurance ─────────────────────────────────
 INSERT INTO insurer_profiles (
