@@ -93,7 +93,7 @@ function LoginContent() {
 
       if (!data.session) { setError('Sign in failed. Please try again.'); return; }
 
-      // ── Smart redirect based on selected role + actual DB role ──────────────
+      // ── Smart redirect based on selected role ────────────────────────────────
       if (selectedRole?.id === 'superadmin') {
         // Verify they are actually a super admin
         const { data: sa } = await supabase
@@ -109,19 +109,9 @@ function LoginContent() {
         }
         router.push('/super-admin');
       } else {
-        // Check if super admin trying regular login → redirect to super-admin
-        const { data: sa } = await supabase
-          .from('super_admins')
-          .select('id')
-          .eq('user_id', data.session.user.id)
-          .single();
-
-        if (sa) {
-          router.push('/super-admin');
-        } else {
-          const redirect = searchParams.get('redirect') || '/dashboard';
-          router.push(redirect);
-        }
+        // Admin or Staff role → always go to dashboard (never redirect to super-admin)
+        const redirect = searchParams.get('redirect') || '/dashboard';
+        router.push(redirect);
       }
     } catch {
       setError('Sign in failed. Please try again.');
