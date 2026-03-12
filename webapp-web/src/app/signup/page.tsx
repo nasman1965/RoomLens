@@ -37,8 +37,10 @@ export default function SignupPage() {
       });
 
       if (signUpError) {
-        if (signUpError.message.includes('already registered')) {
-          setError('This email is already registered. Please sign in.');
+        if (signUpError.message.toLowerCase().includes('already registered') ||
+            signUpError.message.toLowerCase().includes('already exists') ||
+            signUpError.message.toLowerCase().includes('user already')) {
+          setError('This email is already registered. Please sign in instead.');
         } else {
           setError(signUpError.message);
         }
@@ -53,19 +55,29 @@ export default function SignupPage() {
           full_name: fullName,
           company_name: companyName,
           role: 'admin',
+          portal_role: 'company_admin',
           subscription_tier: 'free',
         });
 
         if (data.session) {
-          // Auto-confirmed, redirect to dashboard
+          // Auto-confirmed — go straight to dashboard
           router.push('/dashboard');
         } else {
-          // Email confirmation required
-          setSuccess(true);
+          // No session yet — try signing in immediately
+          const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
+          if (!signInErr && signInData.session) {
+            router.push('/dashboard');
+          } else {
+            // Fallback — show confirmation message
+            setSuccess(true);
+          }
         }
+      } else {
+        setError('Account creation failed. Please try again.');
       }
-    } catch {
-      setError('Sign up failed. Please try again.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Sign up failed. Please try again.';
+      setError(msg);
     } finally { setLoading(false); }
   };
 
