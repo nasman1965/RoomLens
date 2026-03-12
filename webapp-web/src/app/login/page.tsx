@@ -93,52 +93,26 @@ function LoginContent() {
 
       if (!data.session) { setError('Sign in failed. Please try again.'); return; }
 
-      // ── Smart redirect based on selected role ────────────────────────────────
-      if (selectedRole?.id === 'superadmin') {
-        // Verify they are actually a super admin
-        const { data: sa } = await supabase
-          .from('super_admins')
-          .select('id')
-          .eq('user_id', data.session.user.id)
-          .single();
+      // ── Server-side role verification (uses service role, bypasses RLS) ──────
+      const verifyRes = await fetch('/api/auth/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: data.session.user.id,
+          role: selectedRole?.id || 'admin',
+        }),
+      });
+      const verifyData = await verifyRes.json();
 
-        if (!sa) {
-          setError('You do not have Super Admin access.');
-          await supabase.auth.signOut();
-          return;
-        }
-        router.push('/super-admin');
-      } else if (selectedRole?.id === 'staff') {
-        // Staff → check they have a linked team_member record
-        const { data: member } = await supabase
-          .from('team_members')
-          .select('id, full_name, invite_status')
-          .eq('auth_user_id', data.session.user.id)
-          .single();
-
-        if (!member) {
-          setError('Your staff account has not been set up yet. Contact your admin.');
-          await supabase.auth.signOut();
-          return;
-        }
-        if (member.invite_status === 'suspended') {
-          setError('Your account has been suspended. Contact your admin.');
-          await supabase.auth.signOut();
-          return;
-        }
-        // Update last login
-        await supabase.from('team_members')
-          .update({ last_login_at: new Date().toISOString(), invite_status: 'active' })
-          .eq('id', member.id);
-        router.push('/staff/dashboard');
-      } else {
-        // Company Admin → always go to dashboard
-        // Never allow ?redirect to send to /super-admin
-        const rawRedirect = searchParams.get('redirect') || '/dashboard';
-        const safeRedirect = rawRedirect.startsWith('/super-admin') || rawRedirect.startsWith('/staff')
-          ? '/dashboard' : rawRedirect;
-        router.push(safeRedirect);
+      if (!verifyData.allowed) {
+        setError(verifyData.error || 'Access denied. Please contact your admin.');
+        await supabase.auth.signOut();
+        return;
       }
+
+      // Safe redirect — never allow /super-admin for non-superadmin roles
+      const redirect = verifyData.redirect || '/dashboard';
+      router.push(redirect);
     } catch {
       setError('Sign in failed. Please try again.');
     } finally {
