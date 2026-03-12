@@ -106,7 +106,7 @@ export default function Sidebar() {
             <span className="text-xs font-semibold text-slate-300">Restricted Access</span>
           </div>
           <p className="text-[10px] text-slate-500 leading-relaxed">
-            Billing, staff management & role assignments require Company Admin access.
+            Billing, security, notifications & role assignments require Company Admin access.
           </p>
         </div>
       )}

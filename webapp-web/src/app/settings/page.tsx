@@ -41,11 +41,11 @@ const BLANK_MEMBER = { full_name: '', role: 'tech', cell_phone: '', email: '', n
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode; permission?: string }[] = [
   { id: 'profile',       label: 'Profile',        icon: <User className="w-4 h-4" /> },
-  { id: 'team',          label: 'Team Members',   icon: <Users className="w-4 h-4" />,       permission: 'settings_team'    },
-  { id: 'billing',       label: 'Plan & Billing', icon: <CreditCard className="w-4 h-4" />,  permission: 'settings_billing' },
-  { id: 'notifications', label: 'Notifications',  icon: <Bell className="w-4 h-4" /> },
-  { id: 'security',      label: 'Security',       icon: <Shield className="w-4 h-4" /> },
-  { id: 'apps',          label: 'Connected Apps', icon: <Plug className="w-4 h-4" />,         permission: 'settings_apps'    },
+  { id: 'team',          label: 'Team Members',   icon: <Users className="w-4 h-4" />,       permission: 'settings_team'          },
+  { id: 'billing',       label: 'Plan & Billing', icon: <CreditCard className="w-4 h-4" />,  permission: 'settings_billing'       },
+  { id: 'notifications', label: 'Notifications',  icon: <Bell className="w-4 h-4" />,        permission: 'settings_notifications' },
+  { id: 'security',      label: 'Security',       icon: <Shield className="w-4 h-4" />,      permission: 'settings_security'      },
+  { id: 'apps',          label: 'Connected Apps', icon: <Plug className="w-4 h-4" />,        permission: 'settings_apps'          },
 ];
 
 const INTEGRATIONS = [

@@ -77,10 +77,10 @@ const PERMISSIONS: Record<NonNullable<PortalRole>, Permission[]> = {
     'send_invites', 'approve_staff_requests',
     // Reports
     'view_reports', 'export_reports',
-    // Settings — profile, notifications, security, team members
-    'settings_profile', 'settings_team', 'settings_notifications', 'settings_security',
-    // NO: settings_billing, settings_apps, view_billing, manage_billing
-    // NO: assign_roles, manage_portal_access, delete_jobs
+    // Settings — profile + team members ONLY
+    'settings_profile', 'settings_team',
+    // NO: settings_notifications, settings_security, settings_billing, settings_apps
+    // NO: view_billing, manage_billing, assign_roles, manage_portal_access, delete_jobs
     'view_dashboard', 'view_analytics',
   ],
 };
