@@ -59,7 +59,10 @@ export function middleware(req: NextRequest) {
 
     if (!sessionCookie) {
       url.pathname = '/login';
-      url.searchParams.set('redirect', req.nextUrl.pathname);
+      // Never set ?redirect to /super-admin — always fall back to /dashboard
+      const intendedPath = req.nextUrl.pathname;
+      const safeRedirect = intendedPath.startsWith('/super-admin') ? '/dashboard' : intendedPath;
+      url.searchParams.set('redirect', safeRedirect);
       return NextResponse.redirect(url);
     }
   }
