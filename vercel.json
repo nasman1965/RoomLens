@@ -1,0 +1,8 @@
+{
+  "name": "roomlenspro",
+  "framework": "nextjs",
+  "rootDirectory": "webapp-web",
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "installCommand": "npm install"
+}
