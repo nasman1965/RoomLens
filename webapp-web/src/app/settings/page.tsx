@@ -2,6 +2,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { usePermissions, AccessDenied } from '@/hooks/usePermissions';
 import {
   User, Building2, Mail, Save, Loader2, CheckCircle, AlertCircle,
   Users, Plus, Phone, Trash2, Edit3, X, Shield, Bell, CreditCard,
@@ -38,13 +39,13 @@ const ROLES: Record<string, { label: string; color: string }> = {
 
 const BLANK_MEMBER = { full_name: '', role: 'tech', cell_phone: '', email: '', notes: '', temp_password: '' };
 
-const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
+const TABS: { id: Tab; label: string; icon: React.ReactNode; permission?: string }[] = [
   { id: 'profile',       label: 'Profile',        icon: <User className="w-4 h-4" /> },
-  { id: 'team',          label: 'Team Members',   icon: <Users className="w-4 h-4" /> },
-  { id: 'billing',       label: 'Plan & Billing', icon: <CreditCard className="w-4 h-4" /> },
+  { id: 'team',          label: 'Team Members',   icon: <Users className="w-4 h-4" />,       permission: 'settings_team'    },
+  { id: 'billing',       label: 'Plan & Billing', icon: <CreditCard className="w-4 h-4" />,  permission: 'settings_billing' },
   { id: 'notifications', label: 'Notifications',  icon: <Bell className="w-4 h-4" /> },
   { id: 'security',      label: 'Security',       icon: <Shield className="w-4 h-4" /> },
-  { id: 'apps',          label: 'Connected Apps', icon: <Plug className="w-4 h-4" /> },
+  { id: 'apps',          label: 'Connected Apps', icon: <Plug className="w-4 h-4" />,         permission: 'settings_apps'    },
 ];
 
 const INTEGRATIONS = [
