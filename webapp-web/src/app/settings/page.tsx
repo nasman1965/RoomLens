@@ -649,6 +649,7 @@ function SettingsContent() {
             {!permLoading && !can('settings_billing') ? (
               <AccessDenied feature="Plan & Billing" />
             ) : (
+              <>
             <div>
               <h1 className="text-2xl font-bold text-white">Plan & Billing</h1>
               <p className="text-slate-400 text-sm mt-1">Manage your subscription</p>
@@ -723,6 +724,7 @@ function SettingsContent() {
                 </div>
               ))}
             </div>
+              </>
             )}
           </div>
         )}
@@ -829,6 +831,7 @@ function SettingsContent() {
             {!permLoading && !can('settings_apps') ? (
               <AccessDenied feature="Connected Apps" />
             ) : (
+              <>
             <div>
               <h1 className="text-2xl font-bold text-white">Connected Apps</h1>
               <p className="text-slate-400 text-sm mt-1">Integrate third-party tools with RoomLens Pro</p>
@@ -916,6 +919,7 @@ function SettingsContent() {
                 </div>
               ))}
             </div>
+              </>
             )}
           </div>
         )}

@@ -474,7 +474,6 @@ export default function EmployeesPage() {
                           <Edit3 className="w-4 h-4" />
                         </button>
                         )}
-                        </button>
                         <button onClick={() => toggle(m)}
                           className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition"
                           title={m.is_active ? 'Deactivate' : 'Activate'}>
