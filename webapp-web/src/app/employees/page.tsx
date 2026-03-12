@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { usePermissions } from '@/hooks/usePermissions';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import Sidebar from '@/components/Sidebar';
@@ -50,6 +51,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 export default function EmployeesPage() {
   const router = useRouter();
+  const { can } = usePermissions();
+  const canManage = can('add_employees');
 
   const [userId,      setUserId]      = useState('');
   const [company,     setCompany]     = useState('RoomLens Pro');
@@ -204,10 +207,12 @@ export default function EmployeesPage() {
               </h1>
               <p className="text-slate-400 text-sm mt-0.5">{members.length} team member{members.length !== 1 ? 's' : ''}</p>
             </div>
-            <button onClick={openAdd}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition">
-              <Plus className="w-4 h-4" /> Add Employee
-            </button>
+            {canManage && (
+              <button onClick={openAdd}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition">
+                <Plus className="w-4 h-4" /> Add Employee
+              </button>
+            )}
           </div>
         </div>
 
@@ -237,8 +242,8 @@ export default function EmployeesPage() {
             </div>
           )}
 
-          {/* Add/Edit Form */}
-          {showForm && (
+          {/* Add/Edit Form — company_admin only */}
+          {showForm && canManage && (
             <div id="empform" className="bg-slate-800 rounded-xl border border-slate-700 p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-white font-semibold text-sm">{editId ? 'Edit Employee' : 'Add Employee & Send Invite'}</h3>
@@ -413,7 +418,7 @@ export default function EmployeesPage() {
               <p className="text-slate-500 text-sm mb-4">
                 {search || filter !== 'all' ? 'Try a different search or filter' : 'Add your first team member to get started'}
               </p>
-              {!search && filter === 'all' && (
+              {!search && filter === 'all' && canManage && (
                 <button onClick={openAdd}
                   className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition">
                   <Plus className="w-4 h-4" /> Add Employee
@@ -461,11 +466,14 @@ export default function EmployeesPage() {
                         </div>
                       </Link>
 
-                      {/* Actions */}
+                      {/* Actions — company_admin only */}
                       <div className="flex items-center gap-1 shrink-0">
+                        {canManage && (
                         <button onClick={() => openEdit(m)}
                           className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition" title="Edit">
                           <Edit3 className="w-4 h-4" />
+                        </button>
+                        )}
                         </button>
                         <button onClick={() => toggle(m)}
                           className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition"

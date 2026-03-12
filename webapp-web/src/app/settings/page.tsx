@@ -118,6 +118,7 @@ const input = 'w-full px-3 py-2.5 bg-slate-700/50 border border-slate-600 rounde
 function SettingsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { can, loading: permLoading } = usePermissions();
   const [tab, setTab] = useState<Tab>('profile');
 
   // Profile
@@ -357,7 +358,7 @@ function SettingsContent() {
       <aside className="w-56 shrink-0 bg-slate-800/60 border-r border-slate-700 flex flex-col pt-6">
         <p className="px-5 text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-3">Settings</p>
         <nav className="flex-1">
-          {TABS.map(t => (
+          {TABS.filter(t => !t.permission || can(t.permission as Parameters<typeof can>[0])).map(t => (
             <button key={t.id} type="button"
               onClick={() => setTab(t.id)}
               className={`w-full flex items-center gap-3 px-5 py-2.5 text-sm font-medium transition text-left ${
@@ -437,6 +438,7 @@ function SettingsContent() {
         {/* ══════ TEAM MEMBERS ══════ */}
         {tab === 'team' && (
           <div className="space-y-6">
+            {!permLoading && !can('settings_team') && <AccessDenied feature="Team Members" />}
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-bold text-white">Team Members</h1>
@@ -636,6 +638,9 @@ function SettingsContent() {
         {/* ══════ PLAN & BILLING ══════ */}
         {tab === 'billing' && (
           <div className="space-y-6">
+            {!permLoading && !can('settings_billing') ? (
+              <AccessDenied feature="Plan & Billing" />
+            ) : (
             <div>
               <h1 className="text-2xl font-bold text-white">Plan & Billing</h1>
               <p className="text-slate-400 text-sm mt-1">Manage your subscription</p>
@@ -710,6 +715,7 @@ function SettingsContent() {
                 </div>
               ))}
             </div>
+            )}
           </div>
         )}
 
@@ -812,6 +818,9 @@ function SettingsContent() {
         {/* ══════ CONNECTED APPS ══════ */}
         {tab === 'apps' && (
           <div className="space-y-6">
+            {!permLoading && !can('settings_apps') ? (
+              <AccessDenied feature="Connected Apps" />
+            ) : (
             <div>
               <h1 className="text-2xl font-bold text-white">Connected Apps</h1>
               <p className="text-slate-400 text-sm mt-1">Integrate third-party tools with RoomLens Pro</p>
@@ -899,6 +908,7 @@ function SettingsContent() {
                 </div>
               ))}
             </div>
+            )}
           </div>
         )}
 
