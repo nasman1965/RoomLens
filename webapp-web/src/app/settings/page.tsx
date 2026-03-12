@@ -230,7 +230,7 @@ function SettingsContent() {
   const openAdd  = () => { setEditId(null); setMemberForm(BLANK_MEMBER); setMemberErr(''); setMemberOk(''); setShowForm(true); };
   const openEdit = (m: TeamMember) => {
     setEditId(m.id);
-    setMemberForm({ full_name: m.full_name, role: m.role, cell_phone: m.cell_phone || '', email: m.email || '', notes: m.notes || '' });
+    setMemberForm({ full_name: m.full_name, role: m.role, cell_phone: m.cell_phone || '', email: m.email || '', notes: m.notes || '', temp_password: '' });
     setMemberErr(''); setMemberOk('');
     setShowForm(true);
   };
@@ -251,10 +251,12 @@ function SettingsContent() {
         if (error) { setMemberErr(error.message); return; }
         setMemberOk('Member updated.'); setShowForm(false); fetchTeam();
       } else {
-        // Insert new member
+        // Insert new member — exclude temp_password (not a DB column, only used for auth)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { temp_password: _tp, ...memberData } = memberForm;
         const { data: newMember, error: insertError } = await supabase
           .from('team_members')
-          .insert({ ...memberForm, user_id: userId, is_active: true })
+          .insert({ ...memberData, user_id: userId, is_active: true })
           .select('id').single();
         if (insertError || !newMember) { setMemberErr(insertError?.message || 'Insert failed.'); return; }
         memberId = newMember.id;
