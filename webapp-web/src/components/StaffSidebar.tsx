@@ -11,9 +11,9 @@ import {
 const STAFF_NAV = [
   { href: '/staff/dashboard', label: 'My Jobs',      icon: Briefcase },
   { href: '/staff/clock',     label: 'Clock In/Out', icon: Clock     },
-  { href: '/staff/photos',    label: 'Photos',       icon: Camera    },
-  { href: '/staff/floorplan', label: 'Floor Plans',  icon: Map       },
-  { href: '/staff/moisture',  label: 'Moisture Map', icon: Droplets  },
+  { href: '/photos',          label: 'Photos',       icon: Camera    },
+  { href: '/floorplans',      label: 'Floor Plans',  icon: Map       },
+  { href: '/moisture',        label: 'Moisture Map', icon: Droplets  },
   { href: '/staff/profile',   label: 'My Profile',   icon: User      },
 ];
 
