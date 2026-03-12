@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Link auth user to team_member + store invite token
-    await supabaseAdmin.from('team_members').update({
+    const { error: updateError } = await supabaseAdmin.from('team_members').update({
       auth_user_id: authUserId,
       invite_token: token,
       invite_status: 'invited',
@@ -107,12 +107,26 @@ export async function POST(req: NextRequest) {
       invited_at: new Date().toISOString(),
     }).eq('id', member_id);
 
-    // Build SMS message
+    if (updateError) {
+      return NextResponse.json({ error: 'Failed to save invite token: ' + updateError.message }, { status: 500 });
+    }
+
+    // Read back the saved token to confirm what's actually in DB
+    const { data: savedMember } = await supabaseAdmin
+      .from('team_members')
+      .select('invite_token')
+      .eq('id', member_id)
+      .single();
+
+    const confirmedToken = savedMember?.invite_token || token;
+    const confirmedInviteUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://roomlenspro.com'}/staff/invite/${confirmedToken}`;
+
+    // Build SMS message using confirmed URL from DB
     const firstName = full_name.split(' ')[0];
     const smsMessage = `Hi ${firstName}! You've been invited to RoomLens Pro by ${company_name || 'your company'}.
 
 Click to set up your account:
-${inviteUrl}
+${confirmedInviteUrl}
 
 Temp password: ${temp_password}
 
@@ -130,12 +144,12 @@ Link expires in 7 days.`;
 
     return NextResponse.json({
       success: true,
-      invite_url: inviteUrl,
+      invite_url: confirmedInviteUrl,
       auth_user_id: authUserId,
       sms_message: smsMessage,
       sms_sent: smsSent,
       sms_error: smsError || null,
-      token,
+      token: confirmedToken,
     });
 
   } catch (err: any) {

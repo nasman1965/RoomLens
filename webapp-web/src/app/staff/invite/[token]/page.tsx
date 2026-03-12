@@ -1,8 +1,11 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { Building2, Shield, CheckCircle, AlertTriangle, Loader2, Eye, EyeOff, Lock, User } from 'lucide-react';
+import {
+  Building2, Shield, CheckCircle, AlertTriangle,
+  Loader2, Eye, EyeOff, Lock, User,
+} from 'lucide-react';
 
 interface StaffMember {
   id: string;
@@ -10,9 +13,8 @@ interface StaffMember {
   role: string;
   email: string;
   invite_status: string;
-  invite_expires_at: string;
   nda_accepted: boolean;
-  user_id: string;
+  company_name: string;
 }
 
 const NDA_TEXT = `NON-DISCLOSURE AND CONFIDENTIALITY AGREEMENT
@@ -41,54 +43,50 @@ By signing below, you confirm you have read, understood, and agree to be bound b
 
 export default function StaffInvitePage() {
   const params = useParams();
-  const router = useRouter();
   const token  = params.token as string;
 
-  const [step, setStep]         = useState<'loading'|'expired'|'already_done'|'nda'|'password'|'done'>('loading');
-  const [member, setMember]     = useState<StaffMember | null>(null);
+  const [step, setStep]       = useState<'loading'|'expired'|'already_done'|'nda'|'password'|'done'>('loading');
+  const [member, setMember]   = useState<StaffMember | null>(null);
   const [signedName, setSignedName] = useState('');
-  const [agreed, setAgreed]     = useState(false);
+  const [agreed, setAgreed]   = useState(false);
   const [tempPassword, setTempPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
+  const [newPassword, setNewPassword]   = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showTempPass, setShowTempPass] = useState(false);
-  const [showPass, setShowPass] = useState(false);
-  const [error, setError]       = useState('');
-  const [loading, setLoading]   = useState(false);
-  const [companyName, setCompanyName] = useState('');
+  const [showPass, setShowPass]         = useState(false);
+  const [error, setError]     = useState('');
+  const [loading, setLoading] = useState(false);
 
+  // ── Load invite via server API (bypasses RLS) ──────────────────────────────
   useEffect(() => {
     const init = async () => {
-      // Look up invite token
-      const { data: m } = await supabase
-        .from('team_members')
-        .select('id, full_name, role, email, invite_status, invite_expires_at, nda_accepted, user_id')
-        .eq('invite_token', token)
-        .single();
+      try {
+        const res = await fetch(`/api/staff/invite/lookup?token=${encodeURIComponent(token)}`);
+        const data = await res.json();
 
-      if (!m) { setStep('expired'); return; }
+        if (res.status === 404 || data.error === 'not_found') {
+          setStep('expired'); return;
+        }
+        if (res.status === 410 || data.error === 'expired') {
+          setStep('expired'); return;
+        }
+        if (res.status === 409 || data.error === 'already_done') {
+          setStep('already_done'); return;
+        }
+        if (!res.ok) {
+          setStep('expired'); return;
+        }
 
-      // Check if expired
-      if (m.invite_expires_at && new Date(m.invite_expires_at) < new Date()) {
-        setStep('expired'); return;
+        setMember(data);
+        setStep('nda');
+      } catch {
+        setStep('expired');
       }
-
-      // Already onboarded
-      if (m.nda_accepted && m.invite_status === 'active') {
-        setStep('already_done'); return;
-      }
-
-      // Get company name from admin profile
-      const { data: profile } = await supabase
-        .from('users').select('company_name').eq('id', m.user_id).single();
-      setCompanyName(profile?.company_name || 'RoomLens Pro Company');
-
-      setMember(m);
-      setStep('nda');
     };
     init();
   }, [token]);
 
+  // ── NDA acceptance ─────────────────────────────────────────────────────────
   const handleNDAAccept = async () => {
     if (!agreed) { setError('You must check the agreement box.'); return; }
     if (!signedName.trim()) { setError('Please type your full name to sign.'); return; }
@@ -98,24 +96,30 @@ export default function StaffInvitePage() {
     }
     setLoading(true); setError('');
 
-    // Record NDA acceptance
-    await supabase.from('nda_acceptances').insert({
-      member_id: member!.id,
-      signed_name: signedName.trim(),
-      nda_version: 'v1.0',
-      company_name: companyName,
-    });
+    try {
+      const res = await fetch('/api/staff/invite/accept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          member_id: member!.id,
+          action: 'nda',
+          signed_name: signedName.trim(),
+          company_name: member!.company_name,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || 'Failed to save NDA.'); return; }
+    } catch {
+      setError('Network error. Please try again.');
+      return;
+    } finally {
+      setLoading(false);
+    }
 
-    await supabase.from('team_members').update({
-      nda_accepted: true,
-      nda_accepted_at: new Date().toISOString(),
-      nda_signed_name: signedName.trim(),
-    }).eq('id', member!.id);
-
-    setLoading(false);
     setStep('password');
   };
 
+  // ── Set password ───────────────────────────────────────────────────────────
   const handleSetPassword = async () => {
     if (!tempPassword) {
       setError('Please enter the temporary password sent to you by your admin.'); return;
@@ -131,7 +135,7 @@ export default function StaffInvitePage() {
     }
     setLoading(true); setError('');
 
-    // Step 1: Sign in with the temp password
+    // Step 1: Sign in with temp password
     const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
       email: member!.email,
       password: tempPassword,
@@ -139,38 +143,44 @@ export default function StaffInvitePage() {
 
     if (signInError || !signInData.session) {
       setLoading(false);
-      setError('Temporary password is incorrect. Please check the password in your invite message.');
+      setError('Temporary password is incorrect. Check the password in your invite text message.');
       return;
     }
 
     // Step 2: Update to new password
     const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
-
     if (updateError) {
       setLoading(false);
       setError('Failed to set new password: ' + updateError.message);
       return;
     }
 
-    // Step 3: Mark as active
-    await supabase.from('team_members').update({
-      invite_status: 'active',
-      onboarded_at: new Date().toISOString(),
-      last_login_at: new Date().toISOString(),
-    }).eq('id', member!.id);
+    // Step 3: Mark invite as active via server API
+    try {
+      await fetch('/api/staff/invite/accept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ member_id: member!.id, action: 'activate' }),
+      });
+    } catch {
+      // Non-critical — proceed to done even if this fails
+    }
 
     setLoading(false);
     setStep('done');
   };
 
-  // ── LOADING ───────────────────────────────────────────────────────────────
+  // ── LOADING ────────────────────────────────────────────────────────────────
   if (step === 'loading') return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-      <Loader2 className="w-8 h-8 text-teal-400 animate-spin" />
+      <div className="text-center">
+        <Loader2 className="w-10 h-10 text-teal-400 animate-spin mx-auto mb-3" />
+        <p className="text-slate-400 text-sm">Loading your invite...</p>
+      </div>
     </div>
   );
 
-  // ── EXPIRED ───────────────────────────────────────────────────────────────
+  // ── EXPIRED ────────────────────────────────────────────────────────────────
   if (step === 'expired') return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
       <div className="text-center max-w-sm">
@@ -178,12 +188,15 @@ export default function StaffInvitePage() {
           <AlertTriangle className="w-8 h-8 text-red-400" />
         </div>
         <h1 className="text-white font-bold text-xl mb-2">Invite Link Expired</h1>
-        <p className="text-slate-400 text-sm">This invite link is invalid or has expired. Contact your admin for a new invite.</p>
+        <p className="text-slate-400 text-sm mb-4">
+          This invite link is invalid or has expired.
+        </p>
+        <p className="text-slate-500 text-xs">Contact your admin to send a new invite link.</p>
       </div>
     </div>
   );
 
-  // ── ALREADY DONE ──────────────────────────────────────────────────────────
+  // ── ALREADY DONE ───────────────────────────────────────────────────────────
   if (step === 'already_done') return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
       <div className="text-center max-w-sm">
@@ -199,28 +212,33 @@ export default function StaffInvitePage() {
     </div>
   );
 
-  // ── SUCCESS ───────────────────────────────────────────────────────────────
+  // ── SUCCESS ────────────────────────────────────────────────────────────────
   if (step === 'done') return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
       <div className="text-center max-w-sm">
-        <div className="w-16 h-16 rounded-2xl bg-teal-600 flex items-center justify-center mx-auto mb-4">
-          <CheckCircle className="w-8 h-8 text-white" />
+        <div className="w-20 h-20 rounded-2xl bg-teal-600 flex items-center justify-center mx-auto mb-5 shadow-2xl">
+          <CheckCircle className="w-10 h-10 text-white" />
         </div>
         <h1 className="text-white font-bold text-2xl mb-2">
           Welcome, {member?.full_name.split(' ')[0]}! 👷
         </h1>
-        <p className="text-teal-300 font-semibold text-base mb-1">{companyName}</p>
+        <p className="text-teal-300 font-semibold text-base mb-1">{member?.company_name}</p>
         <p className="text-slate-400 text-sm mb-2">Your account is ready.</p>
-        <p className="text-slate-500 text-xs mb-6">NDA signed ✅ · Account activated ✅ · Password set ✅</p>
+        <div className="flex items-center justify-center gap-3 text-xs text-slate-500 mb-6">
+          <span className="flex items-center gap-1"><CheckCircle className="w-3 h-3 text-green-400" /> NDA Signed</span>
+          <span className="flex items-center gap-1"><CheckCircle className="w-3 h-3 text-green-400" /> Account Active</span>
+          <span className="flex items-center gap-1"><CheckCircle className="w-3 h-3 text-green-400" /> Password Set</span>
+        </div>
         <a href="/login"
           className="w-full block bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-xl transition text-sm text-center">
           Log In to RoomLens Pro →
         </a>
-        <p className="text-slate-600 text-xs mt-3">Select "Field Staff" on the login screen</p>
+        <p className="text-slate-600 text-xs mt-3">Select &quot;Field Staff&quot; on the login screen</p>
       </div>
     </div>
   );
 
+  // ── MAIN FLOW ──────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
       <div className="w-full max-w-lg">
@@ -231,13 +249,15 @@ export default function StaffInvitePage() {
             <Building2 className="w-7 h-7 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-white">RoomLens Pro</h1>
-          <p className="text-teal-300 text-sm font-semibold mt-1">{companyName}</p>
+          <p className="text-teal-300 text-sm font-semibold mt-1">{member?.company_name}</p>
           {member && (
-            <p className="text-slate-400 text-sm mt-1">Welcome, <strong className="text-white">{member.full_name}</strong></p>
+            <p className="text-slate-400 text-sm mt-1">
+              Welcome, <strong className="text-white">{member.full_name}</strong>
+            </p>
           )}
         </div>
 
-        {/* ── NDA STEP ───────────────────────────────────────────── */}
+        {/* ── NDA STEP ──────────────────────────────────────────── */}
         {step === 'nda' && (
           <div className="bg-slate-800/80 backdrop-blur rounded-2xl border border-slate-700 p-6 shadow-2xl">
             <div className="flex items-center gap-3 mb-4">
@@ -263,10 +283,16 @@ export default function StaffInvitePage() {
 
             {/* Agree checkbox */}
             <label className="flex items-start gap-3 cursor-pointer mb-4 group">
-              <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)}
-                className="mt-0.5 w-4 h-4 rounded border-slate-500 accent-teal-500 cursor-pointer" />
+              <input
+                type="checkbox"
+                checked={agreed}
+                onChange={e => setAgreed(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-slate-500 accent-teal-500 cursor-pointer"
+              />
               <span className="text-slate-300 text-sm leading-snug">
-                I have read and agree to the Non-Disclosure and Confidentiality Agreement above. I understand my obligations as a staff member of <strong className="text-white">{companyName}</strong>.
+                I have read and agree to the Non-Disclosure and Confidentiality Agreement above.
+                I understand my obligations as a staff member of{' '}
+                <strong className="text-white">{member?.company_name}</strong>.
               </span>
             </label>
 
@@ -285,7 +311,9 @@ export default function StaffInvitePage() {
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 text-sm focus:ring-2 focus:ring-teal-500 outline-none font-medium italic"
                 />
               </div>
-              <p className="text-slate-500 text-xs mt-1">Must match exactly: <span className="text-slate-300">{member?.full_name}</span></p>
+              <p className="text-slate-500 text-xs mt-1">
+                Must match exactly: <span className="text-slate-300">{member?.full_name}</span>
+              </p>
             </div>
 
             {error && (
@@ -294,14 +322,20 @@ export default function StaffInvitePage() {
               </div>
             )}
 
-            <button onClick={handleNDAAccept} disabled={loading || !agreed || !signedName}
-              className="w-full bg-teal-600 hover:bg-teal-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition flex items-center justify-center gap-2 text-sm">
-              {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</> : <>I Agree & Sign NDA →</>}
+            <button
+              onClick={handleNDAAccept}
+              disabled={loading || !agreed || !signedName}
+              className="w-full bg-teal-600 hover:bg-teal-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition flex items-center justify-center gap-2 text-sm"
+            >
+              {loading
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+                : <>I Agree &amp; Sign NDA →</>
+              }
             </button>
           </div>
         )}
 
-        {/* ── PASSWORD STEP ───────────────────────────────────────── */}
+        {/* ── PASSWORD STEP ──────────────────────────────────────── */}
         {step === 'password' && (
           <div className="bg-slate-800/80 backdrop-blur rounded-2xl border border-slate-700 p-6 shadow-2xl">
             <div className="flex items-center gap-3 mb-4">
@@ -310,7 +344,7 @@ export default function StaffInvitePage() {
               </div>
               <div>
                 <p className="text-white font-bold text-base">Step 2 of 2 — Set Your Password</p>
-                <p className="text-slate-400 text-xs">Enter your temporary password, then create a new one</p>
+                <p className="text-slate-400 text-xs">Enter your temp password, then create a new one</p>
               </div>
             </div>
 
@@ -322,18 +356,23 @@ export default function StaffInvitePage() {
 
             <div className="bg-green-900/20 border border-green-700/30 rounded-lg px-3 py-2 mb-4 flex items-center gap-2">
               <CheckCircle className="w-4 h-4 text-green-400 shrink-0" />
-              <p className="text-green-300 text-xs">NDA signed successfully as <strong>{signedName}</strong></p>
+              <p className="text-green-300 text-xs">
+                NDA signed successfully as <strong>{signedName}</strong>
+              </p>
             </div>
 
-            <div className="bg-blue-900/20 border border-blue-700/30 rounded-lg px-3 py-2 mb-4">
-              <p className="text-blue-300 text-xs font-semibold mb-0.5">📱 Find your temporary password</p>
-              <p className="text-slate-400 text-xs">It was included in the invite text message/link sent by your admin.</p>
+            <div className="bg-amber-900/20 border border-amber-700/30 rounded-lg px-3 py-2 mb-4">
+              <p className="text-amber-300 text-xs font-semibold mb-0.5">📱 Find your temporary password</p>
+              <p className="text-slate-400 text-xs">
+                It was included in the invite text message sent by your admin.
+              </p>
             </div>
 
             <div className="space-y-3 mb-4">
+              {/* Temp password */}
               <div>
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
-                  Temporary Password (from invite)
+                  Temporary Password (from invite text)
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -350,28 +389,42 @@ export default function StaffInvitePage() {
                   </button>
                 </div>
               </div>
+
+              {/* New password */}
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">New Password</label>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                  New Password
+                </label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input type={showPass ? 'text' : 'password'} value={newPassword}
+                  <input
+                    type={showPass ? 'text' : 'password'}
+                    value={newPassword}
                     onChange={e => setNewPassword(e.target.value)}
                     placeholder="Min. 8 characters"
-                    className="w-full pl-10 pr-10 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-teal-500 outline-none" />
+                    className="w-full pl-10 pr-10 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-teal-500 outline-none"
+                  />
                   <button type="button" onClick={() => setShowPass(!showPass)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition">
                     {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
+
+              {/* Confirm password */}
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Confirm New Password</label>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Confirm New Password
+                </label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input type={showPass ? 'text' : 'password'} value={confirmPassword}
+                  <input
+                    type={showPass ? 'text' : 'password'}
+                    value={confirmPassword}
                     onChange={e => setConfirmPassword(e.target.value)}
                     placeholder="Repeat new password"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-teal-500 outline-none" />
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-teal-500 outline-none"
+                  />
                 </div>
               </div>
             </div>
@@ -382,9 +435,15 @@ export default function StaffInvitePage() {
               </div>
             )}
 
-            <button onClick={handleSetPassword} disabled={loading || !tempPassword || !newPassword || !confirmPassword}
-              className="w-full bg-teal-600 hover:bg-teal-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition flex items-center justify-center gap-2 text-sm">
-              {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Activating account...</> : <>Activate My Account →</>}
+            <button
+              onClick={handleSetPassword}
+              disabled={loading || !tempPassword || !newPassword || !confirmPassword}
+              className="w-full bg-teal-600 hover:bg-teal-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition flex items-center justify-center gap-2 text-sm"
+            >
+              {loading
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Activating account...</>
+                : <>Activate My Account →</>
+              }
             </button>
           </div>
         )}
