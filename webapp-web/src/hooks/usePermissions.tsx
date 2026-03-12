@@ -96,30 +96,34 @@ export function usePermissions() {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) { setLoading(false); return; }
 
-        // First check users table (company_admin / management_admin)
-        const { data: user } = await supabase
-          .from('users')
-          .select('portal_role')
-          .eq('id', session.user.id)
-          .single();
-
-        if (user?.portal_role) {
-          setRole(user.portal_role as PortalRole);
-          setLoading(false);
-          return;
-        }
-
-        // Fallback: check team_members for management_admin
+        // 1. Check team_members FIRST — management_admins live here
         const { data: member } = await supabase
           .from('team_members')
           .select('portal_role')
           .eq('auth_user_id', session.user.id)
-          .single();
+          .eq('portal_role', 'management_admin')
+          .maybeSingle();
 
         if (member?.portal_role === 'management_admin') {
           setRole('management_admin');
+          setLoading(false);
+          return;
+        }
+
+        // 2. Check users table — company_admin lives here
+        const { data: user } = await supabase
+          .from('users')
+          .select('portal_role')
+          .eq('id', session.user.id)
+          .maybeSingle();
+
+        if (user?.portal_role === 'management_admin') {
+          setRole('management_admin');
+        } else if (user) {
+          // Any user record = company_admin by default
+          setRole('company_admin');
         } else {
-          // Default: treat as company_admin if in users table
+          // No record found — safe default
           setRole('company_admin');
         }
       } catch {
