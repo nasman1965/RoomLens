@@ -47,7 +47,7 @@ export function middleware(req: NextRequest) {
   const protectedPaths = [
     '/dashboard', '/jobs', '/photos', '/floorplans',
     '/moisture', '/equipment', '/reports', '/settings',
-    '/super-admin',
+    '/super-admin', '/staff',
   ];
   const isProtected = protectedPaths.some(p => url.pathname.startsWith(p));
 

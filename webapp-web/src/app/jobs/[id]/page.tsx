@@ -817,6 +817,9 @@ export default function JobDetailPage() {
         <ChevronRight className={`w-5 h-5 flex-shrink-0 ${job.carrier_slug ? 'text-blue-400' : 'text-slate-400'}`} />
       </Link>
 
+      {/* ── Dispatch to Staff ── */}
+      <StaffDispatchPanel jobId={job.id} adminUserId={job.user_id} />
+
       {/* ── Clickable Step Tabs ── */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {/* Tab row */}
@@ -1545,6 +1548,136 @@ export default function JobDetailPage() {
         <span>Created: {new Date(job.created_at).toLocaleString()}</span>
         <span>Updated: {new Date(job.updated_at).toLocaleString()}</span>
       </div>
+    </div>
+  );
+}
+
+// ─── Staff Dispatch Panel ─────────────────────────────────────────────────────
+function StaffDispatchPanel({ jobId, adminUserId }: { jobId: string; adminUserId: string }) {
+  const [teamMembers, setTeamMembers] = useState<{id:string;full_name:string;role:string}[]>([]);
+  const [assignments, setAssignments] = useState<{id:string;member_id:string;status:string;dispatch_notes:string|null;member_name:string}[]>([]);
+  const [selectedMember, setSelectedMember] = useState('');
+  const [dispatchNote, setDispatchNote]     = useState('');
+  const [saving, setSaving] = useState(false);
+  const [open, setOpen]     = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      const { data: members } = await supabase
+        .from('team_members').select('id, full_name, role')
+        .eq('user_id', adminUserId).eq('is_active', true)
+        .not('auth_user_id', 'is', null);
+      if (members) setTeamMembers(members);
+
+      const { data: assigns } = await supabase
+        .from('job_assignments')
+        .select('id, member_id, status, dispatch_notes, team_members(full_name)')
+        .eq('job_id', jobId);
+      if (assigns) {
+        setAssignments(assigns.map((a: any) => ({
+          ...a, member_name: a.team_members?.full_name || 'Unknown',
+        })));
+      }
+    };
+    load();
+  }, [jobId, adminUserId]);
+
+  const dispatch = async () => {
+    if (!selectedMember) return;
+    setSaving(true);
+    await supabase.from('job_assignments').upsert({
+      job_id: jobId, member_id: selectedMember,
+      assigned_by: adminUserId, dispatch_notes: dispatchNote || null,
+      status: 'dispatched',
+    }, { onConflict: 'job_id,member_id' });
+
+    const { data: assigns } = await supabase
+      .from('job_assignments')
+      .select('id, member_id, status, dispatch_notes, team_members(full_name)')
+      .eq('job_id', jobId);
+    if (assigns) setAssignments(assigns.map((a: any) => ({ ...a, member_name: a.team_members?.full_name || 'Unknown' })));
+    setSelectedMember(''); setDispatchNote(''); setSaving(false);
+  };
+
+  const STATUS_COLORS: Record<string,string> = {
+    dispatched: 'bg-blue-100 text-blue-700', accepted: 'bg-teal-100 text-teal-700',
+    in_progress: 'bg-yellow-100 text-yellow-700', completed: 'bg-green-100 text-green-700',
+    declined: 'bg-red-100 text-red-700',
+  };
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <button onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-teal-100 flex items-center justify-center">
+            <Users className="w-4 h-4 text-teal-600" />
+          </div>
+          <div className="text-left">
+            <p className="font-semibold text-sm text-gray-800">👷 Dispatch to Staff</p>
+            <p className="text-xs text-gray-500">
+              {assignments.length > 0
+                ? `${assignments.length} staff assigned`
+                : 'Assign technicians to this job'}
+            </p>
+          </div>
+        </div>
+        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="border-t border-gray-100 p-4 space-y-4">
+          {/* Current assignments */}
+          {assignments.length > 0 && (
+            <div className="space-y-2">
+              {assignments.map(a => (
+                <div key={a.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-teal-600 flex items-center justify-center text-white text-xs font-bold">
+                      {a.member_name.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">{a.member_name}</p>
+                      {a.dispatch_notes && <p className="text-xs text-gray-500">{a.dispatch_notes}</p>}
+                    </div>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUS_COLORS[a.status] || 'bg-gray-100 text-gray-600'}`}>
+                    {a.status.replace('_',' ').toUpperCase()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Assign new */}
+          <div className="space-y-2">
+            <select value={selectedMember} onChange={e => setSelectedMember(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white focus:ring-2 focus:ring-teal-500 outline-none">
+              <option value="">— Select staff member —</option>
+              {teamMembers
+                .filter(m => !assignments.find(a => a.member_id === m.id))
+                .map(m => (
+                  <option key={m.id} value={m.id}>
+                    {m.full_name} ({m.role.replace('_',' ')})
+                  </option>
+                ))}
+            </select>
+            <input type="text" value={dispatchNote} onChange={e => setDispatchNote(e.target.value)}
+              placeholder="Dispatch notes (optional)..."
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:ring-2 focus:ring-teal-500 outline-none" />
+            <button onClick={dispatch} disabled={!selectedMember || saving}
+              className="w-full flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 disabled:bg-gray-300 text-white text-sm font-semibold py-2 rounded-lg transition">
+              <Send className="w-4 h-4" />
+              {saving ? 'Dispatching...' : 'Dispatch to Staff'}
+            </button>
+            {teamMembers.filter(m => !assignments.find(a => a.member_id === m.id)).length === 0 && (
+              <p className="text-xs text-gray-400 text-center">
+                No staff with linked accounts yet. Go to Settings → Team to invite staff.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -108,11 +108,35 @@ function LoginContent() {
           return;
         }
         router.push('/super-admin');
+      } else if (selectedRole?.id === 'staff') {
+        // Staff → check they have a linked team_member record
+        const { data: member } = await supabase
+          .from('team_members')
+          .select('id, full_name, invite_status')
+          .eq('auth_user_id', data.session.user.id)
+          .single();
+
+        if (!member) {
+          setError('Your staff account has not been set up yet. Contact your admin.');
+          await supabase.auth.signOut();
+          return;
+        }
+        if (member.invite_status === 'suspended') {
+          setError('Your account has been suspended. Contact your admin.');
+          await supabase.auth.signOut();
+          return;
+        }
+        // Update last login
+        await supabase.from('team_members')
+          .update({ last_login_at: new Date().toISOString(), invite_status: 'active' })
+          .eq('id', member.id);
+        router.push('/staff/dashboard');
       } else {
-        // Admin or Staff role → always go to dashboard
-        // Never allow ?redirect to send non-superadmin users to /super-admin
+        // Company Admin → always go to dashboard
+        // Never allow ?redirect to send to /super-admin
         const rawRedirect = searchParams.get('redirect') || '/dashboard';
-        const safeRedirect = rawRedirect.startsWith('/super-admin') ? '/dashboard' : rawRedirect;
+        const safeRedirect = rawRedirect.startsWith('/super-admin') || rawRedirect.startsWith('/staff')
+          ? '/dashboard' : rawRedirect;
         router.push(safeRedirect);
       }
     } catch {
