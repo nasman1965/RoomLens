@@ -15,7 +15,7 @@ const NAV_ITEMS = [
   { href: '/moisture',            label: 'Moisture Map', icon: Droplets        },
   { href: '/equipment',           label: 'Equipment',    icon: Package         },
   { href: '/reports',             label: 'Reports',      icon: FileText        },
-  { href: '/settings?tab=team',   label: 'Employees',    icon: Users           },
+  { href: '/employees',            label: 'Employees',    icon: Users           },
   { href: '/settings',            label: 'Settings',     icon: Settings        },
 ];
 
@@ -44,7 +44,9 @@ export default function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const isActive = pathname === href || pathname.startsWith(href + '/');
+          const isActive = pathname === href
+            || (href !== '/settings' && pathname.startsWith(href + '/'))
+            || (href === '/employees' && pathname.startsWith('/employees'));
           return (
             <Link
               key={href}
