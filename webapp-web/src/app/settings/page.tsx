@@ -358,18 +358,26 @@ function SettingsContent() {
       <aside className="w-56 shrink-0 bg-slate-800/60 border-r border-slate-700 flex flex-col pt-6">
         <p className="px-5 text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-3">Settings</p>
         <nav className="flex-1">
-          {TABS.filter(t => !t.permission || can(t.permission as Parameters<typeof can>[0])).map(t => (
-            <button key={t.id} type="button"
-              onClick={() => setTab(t.id)}
-              className={`w-full flex items-center gap-3 px-5 py-2.5 text-sm font-medium transition text-left ${
-                tab === t.id
-                  ? 'bg-blue-600/20 text-blue-300 border-r-2 border-blue-500'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-              }`}>
-              {t.icon}
-              {t.label}
-            </button>
-          ))}
+          {permLoading ? (
+            <div className="space-y-1 px-3">
+              {[1,2,3,4,5].map(i => (
+                <div key={i} className="h-9 bg-slate-700/50 rounded-lg animate-pulse" />
+              ))}
+            </div>
+          ) : (
+            TABS.filter(t => !t.permission || can(t.permission as Parameters<typeof can>[0])).map(t => (
+              <button key={t.id} type="button"
+                onClick={() => setTab(t.id)}
+                className={`w-full flex items-center gap-3 px-5 py-2.5 text-sm font-medium transition text-left ${
+                  tab === t.id
+                    ? 'bg-blue-600/20 text-blue-300 border-r-2 border-blue-500'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                }`}>
+                {t.icon}
+                {t.label}
+              </button>
+            ))
+          )}
         </nav>
       </aside>
 

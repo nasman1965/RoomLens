@@ -69,18 +69,18 @@ const PERMISSIONS: Record<NonNullable<PortalRole>, Permission[]> = {
     'view_dashboard', 'view_analytics',
   ],
   management_admin: [
-    // Operational — NO financials, billing, staff mgmt, destructive actions
+    // Jobs — full access except delete
     'view_jobs', 'create_jobs', 'edit_jobs', 'stop_jobs',
-    // NO: delete_jobs
     'dispatch_staff',
-    'view_employees',
-    // NO: add_employees, edit_employees, delete_employees, send_invites
-    'approve_staff_requests',
+    // Staff — CAN manage staff, add/edit/remove, assign jobs
+    'view_employees', 'add_employees', 'edit_employees', 'delete_employees',
+    'send_invites', 'approve_staff_requests',
+    // Reports
     'view_reports', 'export_reports',
-    'settings_profile', 'settings_notifications', 'settings_security',
-    // NO: settings_team, settings_billing, settings_apps
-    // NO: view_billing, manage_billing
-    // NO: assign_roles, manage_portal_access
+    // Settings — profile, notifications, security, team members
+    'settings_profile', 'settings_team', 'settings_notifications', 'settings_security',
+    // NO: settings_billing, settings_apps, view_billing, manage_billing
+    // NO: assign_roles, manage_portal_access, delete_jobs
     'view_dashboard', 'view_analytics',
   ],
 };
