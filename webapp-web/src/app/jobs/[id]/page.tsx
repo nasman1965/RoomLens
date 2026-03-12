@@ -5,6 +5,10 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import WorkflowProgressBar, { type WorkflowStep } from '@/components/WorkflowProgressBar';
 import DeadlineCountdown from '@/components/DeadlineCountdown';
+import JobPhotosTab from '@/components/job-tabs/JobPhotosTab';
+import JobMoistureTab from '@/components/job-tabs/JobMoistureTab';
+import JobFloorPlanTab from '@/components/job-tabs/JobFloorPlanTab';
+import JobShareTab from '@/components/job-tabs/JobShareTab';
 import {
   ArrowLeft, MapPin, Phone, Mail, User, Calendar, FileText, Hash,
   Building2, Loader2, AlertCircle, CheckCircle, ChevronRight,
@@ -12,6 +16,7 @@ import {
   Zap, Radio, Globe, PhoneCall, Star, UserCheck, Navigation,
   FileCheck, X, Save, Edit3, ExternalLink, Shield, AlertTriangle,
   StopCircle, Users, ChevronDown, Sparkles, RefreshCw, NotebookPen,
+  Camera, Droplets, Map, Share2,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -214,6 +219,9 @@ export default function JobDetailPage() {
   const [savingNotes, setSavingNotes]       = useState(false);
   const [notesError, setNotesError]         = useState('');
   const [notesSaved, setNotesSaved]         = useState(false);
+
+  // Job Hub top-tab
+  const [activeJobTab, setActiveJobTab] = useState<'overview' | 'photos' | 'moisture' | 'floorplans' | 'share'>('overview');
 
   // Stop Job modal state
   const [showStopModal, setShowStopModal] = useState(false);
@@ -782,6 +790,33 @@ export default function JobDetailPage() {
         </div>
       )}
 
+      {/* ── Job Hub Tab Bar ── */}
+      <div className="border-b border-gray-200 bg-white sticky top-0 z-10 -mx-6 px-6">
+        <div className="flex overflow-x-auto scrollbar-hide gap-1">
+          {([
+            { id: 'overview',   label: 'Overview',     icon: FileText  },
+            { id: 'photos',     label: 'Photos',        icon: Camera    },
+            { id: 'moisture',   label: 'Moisture',      icon: Droplets  },
+            { id: 'floorplans', label: 'Floor Plans',   icon: Map       },
+            { id: 'share',      label: 'Share',         icon: Share2    },
+          ] as { id: typeof activeJobTab; label: string; icon: React.ElementType }[]).map(tab => (
+            <button key={tab.id} type="button"
+              onClick={() => setActiveJobTab(tab.id)}
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition shrink-0 ${
+                activeJobTab === tab.id
+                  ? 'border-blue-600 text-blue-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}>
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Overview Tab ── */}
+      {activeJobTab === 'overview' && (<>
+
       {/* ── Deadline Countdowns ── */}
       <DeadlineCountdown createdAt={job.created_at} />
 
@@ -818,7 +853,7 @@ export default function JobDetailPage() {
       </Link>
 
       {/* ── Dispatch to Staff ── */}
-      <StaffDispatchPanel jobId={job.id} adminUserId={job.user_id} />
+      <StaffDispatchPanel jobId={job.id} adminUserId={userId} />
 
       {/* ── Clickable Step Tabs ── */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -1548,6 +1583,37 @@ export default function JobDetailPage() {
         <span>Created: {new Date(job.created_at).toLocaleString()}</span>
         <span>Updated: {new Date(job.updated_at).toLocaleString()}</span>
       </div>
+
+      </>)}
+
+      {/* ── Photos Tab ── */}
+      {activeJobTab === 'photos' && (
+        <div className="py-2">
+          <JobPhotosTab jobId={job.id} userId={userId} />
+        </div>
+      )}
+
+      {/* ── Moisture Tab ── */}
+      {activeJobTab === 'moisture' && (
+        <div className="py-2">
+          <JobMoistureTab jobId={job.id} userId={userId} />
+        </div>
+      )}
+
+      {/* ── Floor Plans Tab ── */}
+      {activeJobTab === 'floorplans' && (
+        <div className="py-2">
+          <JobFloorPlanTab jobId={job.id} userId={userId} />
+        </div>
+      )}
+
+      {/* ── Share Tab ── */}
+      {activeJobTab === 'share' && (
+        <div className="py-2">
+          <JobShareTab jobId={job.id} userId={userId} />
+        </div>
+      )}
+
     </div>
   );
 }

@@ -28,6 +28,8 @@ interface ClockEntry {
   clock_out_at: string | null;
   duration_minutes: number | null;
   notes: string | null;
+  clock_in_lat: number | null;
+  clock_in_lng: number | null;
 }
 
 const TABS = [

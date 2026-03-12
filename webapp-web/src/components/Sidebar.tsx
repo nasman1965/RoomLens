@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { usePermissions, RoleBadge } from '@/hooks/usePermissions';
 import {
-  LayoutDashboard, Briefcase, Camera, Map, Droplets,
+  LayoutDashboard, Briefcase,
   FileText, Settings, LogOut, Building2, ChevronRight,
   Package, Users, Shield, Lock,
 } from 'lucide-react';
@@ -14,9 +14,6 @@ const ALL_NAV = [
   { href: '/dashboard',  label: 'Dashboard',    icon: LayoutDashboard, permission: 'view_dashboard'  },
   { href: '/jobs',       label: 'Jobs',         icon: Briefcase,       permission: 'view_jobs'       },
   { href: '/employees',  label: 'Employees',    icon: Users,           permission: 'view_employees'  },
-  { href: '/photos',     label: 'Photos',       icon: Camera,          permission: 'view_jobs'       },
-  { href: '/floorplans', label: 'Floor Plans',  icon: Map,             permission: 'view_jobs'       },
-  { href: '/moisture',   label: 'Moisture Map', icon: Droplets,        permission: 'view_jobs'       },
   { href: '/equipment',  label: 'Equipment',    icon: Package,         permission: 'view_jobs'       },
   { href: '/reports',    label: 'Reports',      icon: FileText,        permission: 'view_reports'    },
   { href: '/settings',   label: 'Settings',     icon: Settings,        permission: 'settings_profile'},

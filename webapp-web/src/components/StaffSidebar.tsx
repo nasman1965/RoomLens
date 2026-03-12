@@ -4,16 +4,13 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import {
-  Briefcase, Camera, Map, Droplets,
+  Briefcase,
   LogOut, Building2, ChevronRight, Clock, User,
 } from 'lucide-react';
 
 const STAFF_NAV = [
   { href: '/staff/dashboard', label: 'My Jobs',      icon: Briefcase },
   { href: '/staff/clock',     label: 'Clock In/Out', icon: Clock     },
-  { href: '/photos',          label: 'Photos',       icon: Camera    },
-  { href: '/floorplans',      label: 'Floor Plans',  icon: Map       },
-  { href: '/moisture',        label: 'Moisture Map', icon: Droplets  },
   { href: '/staff/profile',   label: 'My Profile',   icon: User      },
 ];
 
@@ -95,6 +92,13 @@ export default function StaffSidebar() {
           );
         })}
       </nav>
+
+      {/* Job Hub hint */}
+      <div className="mx-3 mb-2 bg-slate-800/60 border border-slate-700 rounded-xl p-3">
+        <p className="text-[10px] text-slate-400 leading-relaxed">
+          📷 Photos · 💧 Moisture · 📐 Floor Plans are inside each job — tap a job from <strong className="text-slate-300">My Jobs</strong> to access them.
+        </p>
+      </div>
 
       {/* Sign Out */}
       <div className="px-3 py-4 border-t border-slate-700">
