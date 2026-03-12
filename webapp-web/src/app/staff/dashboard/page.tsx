@@ -151,18 +151,25 @@ export default function StaffDashboard() {
       <StaffSidebar />
       <main className="flex-1 overflow-y-auto">
         {/* Header */}
-        <div className="bg-slate-900 border-b border-slate-700 px-6 py-4">
+        <div className="bg-slate-900 border-b border-slate-700 px-6 py-5">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-white font-bold text-xl">
-                Welcome, {staff.full_name.split(' ')[0]} 👷
+              <p className="text-teal-400 text-xs font-semibold uppercase tracking-widest mb-0.5">Field Staff Portal</p>
+              <h1 className="text-white font-bold text-2xl">
+                👷 {staff.full_name}
               </h1>
               <p className="text-slate-400 text-sm mt-0.5">{today}</p>
             </div>
-            <div className="text-right">
+            <div className="text-right flex flex-col items-end gap-2">
               <span className="text-xs font-bold px-3 py-1 rounded-full bg-teal-900/40 text-teal-300 border border-teal-700/40 capitalize">
                 {staff.role.replace('_', ' ')}
               </span>
+              {jobs.filter(j => j.clocked_in).length > 0 && (
+                <span className="text-xs font-bold px-3 py-1 rounded-full bg-green-900/40 text-green-300 border border-green-700/40 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" />
+                  On Site
+                </span>
+              )}
             </div>
           </div>
         </div>

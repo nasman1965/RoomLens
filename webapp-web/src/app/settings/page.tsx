@@ -7,6 +7,7 @@ import {
   Users, Plus, Phone, Trash2, Edit3, X, Shield, Bell, CreditCard,
   Plug, Key, Eye, EyeOff, ToggleLeft, ToggleRight,
   ChevronRight, Zap, Globe, BarChart2, FileText, Clock,
+  Send, Copy, ExternalLink, Lock,
 } from 'lucide-react';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -18,6 +19,8 @@ interface TeamMember {
   id: string; full_name: string; role: string;
   cell_phone: string | null; email: string | null;
   is_active: boolean; notes: string | null; created_at: string;
+  invite_status: string | null; nda_accepted: boolean | null;
+  invite_token: string | null;
 }
 
 type Tab = 'profile' | 'team' | 'billing' | 'notifications' | 'security' | 'apps';
@@ -33,7 +36,7 @@ const ROLES: Record<string, { label: string; color: string }> = {
   other:         { label: 'Other',         color: 'bg-slate-700 text-slate-300'      },
 };
 
-const BLANK_MEMBER = { full_name: '', role: 'tech', cell_phone: '', email: '', notes: '' };
+const BLANK_MEMBER = { full_name: '', role: 'tech', cell_phone: '', email: '', notes: '', temp_password: '' };
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'profile',       label: 'Profile',        icon: <User className="w-4 h-4" /> },
@@ -135,6 +138,10 @@ function SettingsContent() {
   const [savingMember, setSavingMember]= useState(false);
   const [memberOk,     setMemberOk]   = useState('');
   const [memberErr,    setMemberErr]  = useState('');
+  const [showTempPw,   setShowTempPw] = useState(false);
+  const [inviteResult, setInviteResult] = useState<{
+    url: string; sms: string; name: string; phone: string;
+  } | null>(null);
 
   // Notifications
   const [notifs, setNotifs] = useState({
@@ -192,7 +199,8 @@ function SettingsContent() {
 
   const fetchTeam = async () => {
     setLoadingTeam(true);
-    const { data } = await supabase.from('team_members').select('*')
+    const { data } = await supabase.from('team_members')
+      .select('id, full_name, role, cell_phone, email, is_active, notes, created_at, invite_status, nda_accepted, invite_token')
       .eq('user_id', userId).order('is_active', { ascending: false }).order('full_name');
     setMembers(data || []);
     setLoadingTeam(false);
@@ -229,15 +237,58 @@ function SettingsContent() {
   const saveMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!memberForm.full_name.trim()) { setMemberErr('Name is required.'); return; }
+    if (!editId && !memberForm.email?.trim()) { setMemberErr('Email is required to send invite.'); return; }
+    if (!editId && !memberForm.temp_password?.trim()) { setMemberErr('Temp password is required.'); return; }
     setSavingMember(true); setMemberErr(''); setMemberOk('');
     try {
-      const payload = { ...memberForm, user_id: userId, is_active: true };
-      let error;
-      if (editId) ({ error } = await supabase.from('team_members').update({ full_name: memberForm.full_name, role: memberForm.role, cell_phone: memberForm.cell_phone || null, email: memberForm.email || null, notes: memberForm.notes || null }).eq('id', editId));
-      else ({ error } = await supabase.from('team_members').insert(payload));
-      if (error) setMemberErr(error.message);
-      else { setMemberOk(editId ? 'Member updated.' : 'Member added.'); setShowForm(false); fetchTeam(); }
-    } catch { setMemberErr('Save failed.'); }
+      let memberId = editId;
+      if (editId) {
+        const { error } = await supabase.from('team_members').update({
+          full_name: memberForm.full_name, role: memberForm.role,
+          cell_phone: memberForm.cell_phone || null,
+          email: memberForm.email || null, notes: memberForm.notes || null,
+        }).eq('id', editId);
+        if (error) { setMemberErr(error.message); return; }
+        setMemberOk('Member updated.'); setShowForm(false); fetchTeam();
+      } else {
+        // Insert new member
+        const { data: newMember, error: insertError } = await supabase
+          .from('team_members')
+          .insert({ ...memberForm, user_id: userId, is_active: true })
+          .select('id').single();
+        if (insertError || !newMember) { setMemberErr(insertError?.message || 'Insert failed.'); return; }
+        memberId = newMember.id;
+
+        // Send invite via API
+        const res = await fetch('/api/staff/invite', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            member_id: memberId,
+            email: memberForm.email,
+            full_name: memberForm.full_name,
+            temp_password: memberForm.temp_password,
+            company_name: profile?.company_name || 'RoomLens Pro',
+            admin_user_id: userId,
+          }),
+        });
+        const result = await res.json();
+        if (result.success) {
+          // Show invite link + SMS copy
+          setInviteResult({
+            url: result.invite_url,
+            sms: result.sms_message,
+            name: memberForm.full_name,
+            phone: memberForm.cell_phone || '',
+          });
+          setMemberOk('');
+          setShowForm(false);
+          fetchTeam();
+        } else {
+          setMemberErr(result.error || 'Invite failed.');
+        }
+      }
+    } catch (err: any) { setMemberErr('Save failed: ' + err.message); }
     finally { setSavingMember(false); }
   };
   const toggleActive = async (m: TeamMember) => {
@@ -428,11 +479,41 @@ function SettingsContent() {
                     <input type="text" value={memberForm.notes} onChange={e => setMemberForm(p => ({ ...p, notes: e.target.value }))}
                       placeholder="Optional notes" className={input} />
                   </Field>
+
+                  {/* Temp password — only shown when adding new member */}
+                  {!editId && (
+                    <div className="bg-teal-900/20 border border-teal-700/40 rounded-xl p-4">
+                      <p className="text-teal-300 text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5" /> Staff Login Setup
+                      </p>
+                      <p className="text-slate-400 text-xs mb-3">
+                        Create a temporary password. Staff will use this to access the invite link and will set their own password during onboarding.
+                      </p>
+                      <Field label="Temporary Password *">
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <input
+                            type={showTempPw ? 'text' : 'password'}
+                            value={memberForm.temp_password}
+                            onChange={e => setMemberForm(p => ({ ...p, temp_password: e.target.value }))}
+                            placeholder="Min. 8 characters (e.g. Staff2026!)"
+                            className="w-full pl-10 pr-10 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-400 focus:ring-2 focus:ring-teal-500 outline-none"
+                            required={!editId}
+                          />
+                          <button type="button" onClick={() => setShowTempPw(!showTempPw)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition">
+                            {showTempPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </Field>
+                    </div>
+                  )}
+
                   <div className="flex gap-2 pt-1">
                     <button type="submit" disabled={savingMember}
                       className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white font-semibold py-2 px-5 rounded-lg transition text-sm">
-                      {savingMember ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                      {editId ? 'Update' : 'Add Member'}
+                      {savingMember ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                      {editId ? 'Update Member' : 'Create & Send Invite'}
                     </button>
                     <button type="button" onClick={() => setShowForm(false)}
                       className="py-2 px-5 rounded-lg text-sm font-medium text-slate-400 hover:text-white border border-slate-600 hover:border-slate-500 transition">
@@ -440,6 +521,69 @@ function SettingsContent() {
                     </button>
                   </div>
                 </form>
+              </div>
+            )}
+
+            {/* ── Invite Result Modal ─────────────────────────────────── */}
+            {inviteResult && (
+              <div className="bg-teal-900/20 border border-teal-600/40 rounded-2xl p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-teal-600 flex items-center justify-center">
+                      <CheckCircle className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-white font-bold text-base">Invite Created!</p>
+                      <p className="text-teal-300 text-xs">Account created for {inviteResult.name}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setInviteResult(null)} className="text-slate-400 hover:text-white transition">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Invite Link */}
+                <div className="mb-4">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Invite Link</p>
+                  <div className="flex items-center gap-2 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2">
+                    <code className="text-teal-300 text-xs flex-1 break-all">{inviteResult.url}</code>
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(inviteResult.url); }}
+                      className="shrink-0 text-slate-400 hover:text-teal-300 transition" title="Copy link">
+                      <Copy className="w-4 h-4" />
+                    </button>
+                    <a href={inviteResult.url} target="_blank" rel="noopener noreferrer"
+                      className="shrink-0 text-slate-400 hover:text-teal-300 transition" title="Open link">
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  </div>
+                </div>
+
+                {/* SMS Message */}
+                <div className="mb-4">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">SMS / Text Message</p>
+                  <div className="bg-slate-800 border border-slate-600 rounded-lg p-3 relative">
+                    <pre className="text-slate-300 text-xs whitespace-pre-wrap leading-relaxed font-sans">{inviteResult.sms}</pre>
+                    <button
+                      onClick={() => navigator.clipboard.writeText(inviteResult.sms)}
+                      className="absolute top-2 right-2 text-slate-500 hover:text-teal-300 transition" title="Copy SMS">
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Send via SMS link if phone available */}
+                {inviteResult.phone && (
+                  <a
+                    href={`sms:${inviteResult.phone}?body=${encodeURIComponent(inviteResult.sms)}`}
+                    className="flex items-center justify-center gap-2 w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2.5 px-5 rounded-xl transition text-sm">
+                    <Phone className="w-4 h-4" />
+                    Open Text Message to {inviteResult.name.split(' ')[0]}
+                  </a>
+                )}
+                <p className="text-slate-500 text-xs mt-3 text-center">
+                  Copy and send the link via text or email. Staff must click the link, sign the NDA, and set their own password.
+                </p>
               </div>
             )}
 
@@ -791,36 +935,72 @@ function MemberCard({ m, onEdit, onToggle, onDelete }: {
   onDelete: (id: string, name: string) => void;
 }) {
   const roleInfo = ROLES[m.role] || ROLES.other;
+  const inviteLink = m.invite_token
+    ? `${typeof window !== 'undefined' ? window.location.origin : 'https://roomlenspro.com'}/staff/invite/${m.invite_token}`
+    : null;
+
+  // Invite status badge
+  const inviteBadge = (() => {
+    if (m.nda_accepted && m.invite_status === 'active') return { label: '✅ Active', cls: 'bg-green-900/60 text-green-300' };
+    if (m.invite_status === 'invited') return { label: '📨 Invite Sent', cls: 'bg-yellow-900/60 text-yellow-300' };
+    if (m.invite_status === 'pending') return { label: '⏳ Not Invited', cls: 'bg-slate-700 text-slate-400' };
+    if (m.invite_status === 'suspended') return { label: '🚫 Suspended', cls: 'bg-red-900/60 text-red-300' };
+    return null;
+  })();
+
   return (
-    <div className={`bg-slate-800 rounded-xl border p-4 flex items-center gap-4 transition ${m.is_active ? 'border-slate-700' : 'border-slate-700/40 opacity-50'}`}>
-      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-bold text-sm ${m.is_active ? 'bg-blue-900/50 text-blue-300' : 'bg-slate-700 text-slate-500'}`}>
-        {m.full_name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <p className="text-sm font-semibold text-white">{m.full_name}</p>
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${roleInfo.color}`}>{roleInfo.label}</span>
-          {!m.is_active && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-700 text-slate-400">INACTIVE</span>}
+    <div className={`bg-slate-800 rounded-xl border p-4 transition ${m.is_active ? 'border-slate-700' : 'border-slate-700/40 opacity-50'}`}>
+      <div className="flex items-center gap-4">
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-bold text-sm ${m.is_active ? 'bg-blue-900/50 text-blue-300' : 'bg-slate-700 text-slate-500'}`}>
+          {m.full_name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
         </div>
-        <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-          {m.cell_phone && <a href={`tel:${m.cell_phone}`} className="flex items-center gap-1 text-xs text-blue-400 hover:underline"><Phone className="w-3 h-3" />{m.cell_phone}</a>}
-          {m.email && <a href={`mailto:${m.email}`} className="flex items-center gap-1 text-xs text-slate-400 hover:underline"><Mail className="w-3 h-3" />{m.email}</a>}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-sm font-semibold text-white">{m.full_name}</p>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${roleInfo.color}`}>{roleInfo.label}</span>
+            {!m.is_active && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-700 text-slate-400">INACTIVE</span>}
+            {inviteBadge && <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${inviteBadge.cls}`}>{inviteBadge.label}</span>}
+          </div>
+          <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+            {m.cell_phone && <a href={`tel:${m.cell_phone}`} className="flex items-center gap-1 text-xs text-blue-400 hover:underline"><Phone className="w-3 h-3" />{m.cell_phone}</a>}
+            {m.email && <a href={`mailto:${m.email}`} className="flex items-center gap-1 text-xs text-slate-400 hover:underline"><Mail className="w-3 h-3" />{m.email}</a>}
+          </div>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <button type="button" onClick={() => onEdit(m)} title="Edit"
+            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition">
+            <Edit3 className="w-4 h-4" />
+          </button>
+          <button type="button" onClick={() => onToggle(m)} title={m.is_active ? 'Deactivate' : 'Activate'}
+            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition">
+            {m.is_active ? <ToggleRight className="w-4 h-4 text-green-400" /> : <ToggleLeft className="w-4 h-4" />}
+          </button>
+          <button type="button" onClick={() => onDelete(m.id, m.full_name)} title="Delete"
+            className="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-900/20 transition">
+            <Trash2 className="w-4 h-4" />
+          </button>
         </div>
       </div>
-      <div className="flex items-center gap-1 shrink-0">
-        <button type="button" onClick={() => onEdit(m)} title="Edit"
-          className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition">
-          <Edit3 className="w-4 h-4" />
-        </button>
-        <button type="button" onClick={() => onToggle(m)} title={m.is_active ? 'Deactivate' : 'Activate'}
-          className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition">
-          {m.is_active ? <ToggleRight className="w-4 h-4 text-green-400" /> : <ToggleLeft className="w-4 h-4" />}
-        </button>
-        <button type="button" onClick={() => onDelete(m.id, m.full_name)} title="Delete"
-          className="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-900/20 transition">
-          <Trash2 className="w-4 h-4" />
-        </button>
-      </div>
+
+      {/* Invite link row — shown if invite_token exists and not yet active */}
+      {inviteLink && m.invite_status !== 'active' && (
+        <div className="mt-3 pt-3 border-t border-slate-700/60 flex items-center gap-2">
+          <Send className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+          <code className="text-teal-300 text-xs flex-1 truncate">{inviteLink}</code>
+          <button
+            onClick={() => navigator.clipboard.writeText(inviteLink)}
+            className="text-slate-400 hover:text-teal-300 transition shrink-0" title="Copy invite link">
+            <Copy className="w-3.5 h-3.5" />
+          </button>
+          {m.cell_phone && (
+            <a
+              href={`sms:${m.cell_phone}?body=${encodeURIComponent(`Hi ${m.full_name.split(' ')[0]}! Here is your RoomLens Pro invite link: ${inviteLink}`)}`}
+              className="text-slate-400 hover:text-teal-300 transition shrink-0" title="Send via text">
+              <Phone className="w-3.5 h-3.5" />
+            </a>
+          )}
+        </div>
+      )}
     </div>
   );
 }

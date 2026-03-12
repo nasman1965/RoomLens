@@ -1,4 +1,5 @@
 'use client';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -19,11 +20,33 @@ const STAFF_NAV = [
 export default function StaffSidebar() {
   const pathname = usePathname();
   const router   = useRouter();
+  const [staffName, setStaffName] = useState('');
+  const [staffRole, setStaffRole] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const { data: member } = await supabase
+        .from('team_members')
+        .select('full_name, role')
+        .eq('auth_user_id', session.user.id)
+        .single();
+      if (member) {
+        setStaffName(member.full_name);
+        setStaffRole(member.role);
+      }
+    })();
+  }, []);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     router.push('/login');
   };
+
+  const initials = staffName
+    ? staffName.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
+    : '?';
 
   return (
     <aside className="w-64 bg-slate-900 text-white flex flex-col h-screen sticky top-0">
@@ -37,6 +60,19 @@ export default function StaffSidebar() {
           <p className="text-teal-400 text-xs font-medium">Field Staff Portal</p>
         </div>
       </div>
+
+      {/* Staff identity card */}
+      {staffName && (
+        <div className="mx-3 mt-3 bg-teal-900/30 border border-teal-700/40 rounded-xl px-4 py-3 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-teal-600 flex items-center justify-center shrink-0 text-sm font-bold text-white">
+            {initials}
+          </div>
+          <div className="min-w-0">
+            <p className="text-white font-semibold text-sm leading-tight truncate">{staffName}</p>
+            <p className="text-teal-400 text-xs capitalize">{staffRole.replace('_', ' ')}</p>
+          </div>
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
