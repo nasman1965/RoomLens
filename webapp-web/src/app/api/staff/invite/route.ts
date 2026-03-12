@@ -1,19 +1,63 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// Admin-only API route to send staff invite
+// Admin-only API route to send staff invite + auto-SMS via Twilio
 // POST /api/staff/invite
-// Body: { member_id, email, full_name, temp_password, company_name, admin_user_id }
+// Body: { member_id, email, full_name, temp_password, company_name, admin_user_id, cell_phone? }
+
+async function sendTwilioSMS(to: string, body: string): Promise<{ sent: boolean; error?: string }> {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken  = process.env.TWILIO_AUTH_TOKEN;
+  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+
+  if (!accountSid || !authToken || !fromNumber) {
+    return { sent: false, error: 'Twilio not configured' };
+  }
+
+  // Clean phone number — ensure it has country code
+  const cleanPhone = to.replace(/\D/g, '');
+  const e164 = cleanPhone.startsWith('1') ? `+${cleanPhone}` : `+1${cleanPhone}`;
+
+  try {
+    const credentials = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+    const res = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${credentials}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          From: fromNumber,
+          To: e164,
+          Body: body,
+        }).toString(),
+      }
+    );
+
+    const data = await res.json();
+    if (data.error_code) {
+      return { sent: false, error: `Twilio error ${data.error_code}: ${data.message}` };
+    }
+    return { sent: true };
+  } catch (err: any) {
+    return { sent: false, error: err.message };
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
-    const { member_id, email, full_name, temp_password, company_name, admin_user_id } = await req.json();
+    const {
+      member_id, email, full_name, temp_password,
+      company_name, admin_user_id, cell_phone,
+    } = await req.json();
 
     if (!member_id || !email || !full_name || !temp_password) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Use service role to create auth user + send invite
+    // Use service role to create auth user
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -25,14 +69,13 @@ export async function POST(req: NextRequest) {
     const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://roomlenspro.com'}/staff/invite/${token}`;
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
-    // Create Supabase auth user with temp password
+    // Create or update Supabase auth user
     let authUserId: string | null = null;
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
     const existingUser = existingUsers?.users?.find(u => u.email === email);
 
     if (existingUser) {
       authUserId = existingUser.id;
-      // Update password
       await supabaseAdmin.auth.admin.updateUserById(existingUser.id, {
         password: temp_password,
         email_confirm: true,
@@ -41,7 +84,7 @@ export async function POST(req: NextRequest) {
       const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
         email,
         password: temp_password,
-        email_confirm: true, // Skip email confirmation — we're sending our own invite
+        email_confirm: true,
         user_metadata: { full_name, role: 'staff', company: company_name },
       });
       if (createError) {
@@ -64,14 +107,34 @@ export async function POST(req: NextRequest) {
       invited_at: new Date().toISOString(),
     }).eq('id', member_id);
 
-    // Build SMS/invite message
-    const smsMessage = `Hi ${full_name.split(' ')[0]}! You've been invited to RoomLens Pro by ${company_name || 'your company'}.\n\nClick to set up your account:\n${inviteUrl}\n\nTemp password: ${temp_password}\n\nLink expires in 7 days.`;
+    // Build SMS message
+    const firstName = full_name.split(' ')[0];
+    const smsMessage = `Hi ${firstName}! You've been invited to RoomLens Pro by ${company_name || 'your company'}.
+
+Click to set up your account:
+${inviteUrl}
+
+Temp password: ${temp_password}
+
+Link expires in 7 days.`;
+
+    // Auto-send SMS via Twilio if phone provided
+    let smsSent = false;
+    let smsError = '';
+
+    if (cell_phone) {
+      const result = await sendTwilioSMS(cell_phone, smsMessage);
+      smsSent = result.sent;
+      smsError = result.error || '';
+    }
 
     return NextResponse.json({
       success: true,
       invite_url: inviteUrl,
       auth_user_id: authUserId,
       sms_message: smsMessage,
+      sms_sent: smsSent,
+      sms_error: smsError || null,
       token,
     });
 

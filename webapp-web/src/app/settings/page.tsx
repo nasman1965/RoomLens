@@ -140,7 +140,7 @@ function SettingsContent() {
   const [memberErr,    setMemberErr]  = useState('');
   const [showTempPw,   setShowTempPw] = useState(false);
   const [inviteResult, setInviteResult] = useState<{
-    url: string; sms: string; name: string; phone: string;
+    url: string; sms: string; name: string; phone: string; smsSent?: boolean;
   } | null>(null);
 
   // Notifications
@@ -261,7 +261,7 @@ function SettingsContent() {
         if (insertError || !newMember) { setMemberErr(insertError?.message || 'Insert failed.'); return; }
         memberId = newMember.id;
 
-        // Send invite via API
+        // Send invite via API (includes auto-SMS if Twilio configured)
         const res = await fetch('/api/staff/invite', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -272,16 +272,17 @@ function SettingsContent() {
             temp_password: memberForm.temp_password,
             company_name: profile?.company_name || 'RoomLens Pro',
             admin_user_id: userId,
+            cell_phone: memberForm.cell_phone || null,
           }),
         });
         const result = await res.json();
         if (result.success) {
-          // Show invite link + SMS copy
           setInviteResult({
             url: result.invite_url,
             sms: result.sms_message,
             name: memberForm.full_name,
             phone: memberForm.cell_phone || '',
+            smsSent: result.sms_sent || false,
           });
           setMemberOk('');
           setShowForm(false);
@@ -536,7 +537,10 @@ function SettingsContent() {
                     </div>
                     <div>
                       <p className="text-white font-bold text-base">Invite Created!</p>
-                      <p className="text-teal-300 text-xs">Account created for {inviteResult.name}</p>
+                      <p className="text-teal-300 text-xs">
+                        Account created for {inviteResult.name}
+                        {inviteResult.smsSent && <span className="ml-2 text-green-400 font-semibold">· 📱 SMS sent!</span>}
+                      </p>
                     </div>
                   </div>
                   <button onClick={() => setInviteResult(null)} className="text-slate-400 hover:text-white transition">
@@ -574,17 +578,25 @@ function SettingsContent() {
                   </div>
                 </div>
 
-                {/* Send via SMS link if phone available */}
-                {inviteResult.phone && (
+                {/* Send via SMS */}
+                {inviteResult.smsSent ? (
+                  <div className="flex items-center justify-center gap-2 w-full bg-green-700/30 border border-green-600/40 text-green-300 font-semibold py-2.5 px-5 rounded-xl text-sm">
+                    <CheckCircle className="w-4 h-4" />
+                    SMS Sent to {inviteResult.name.split(' ')[0]} ✅
+                  </div>
+                ) : inviteResult.phone ? (
                   <a
                     href={`sms:${inviteResult.phone}?body=${encodeURIComponent(inviteResult.sms)}`}
                     className="flex items-center justify-center gap-2 w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2.5 px-5 rounded-xl transition text-sm">
                     <Phone className="w-4 h-4" />
                     Open Text Message to {inviteResult.name.split(' ')[0]}
                   </a>
-                )}
+                ) : null}
                 <p className="text-slate-500 text-xs mt-3 text-center">
-                  Copy and send the link via text or email. Staff must click the link, sign the NDA, and set their own password.
+                  {inviteResult.smsSent
+                    ? 'SMS was automatically sent. Staff must click the link, sign the NDA, and set their own password.'
+                    : 'Copy and send the link via text or email. Staff must click the link, sign the NDA, and set their own password.'
+                  }
                 </p>
               </div>
             )}
