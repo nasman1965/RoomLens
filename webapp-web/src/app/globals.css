@@ -3,46 +3,49 @@
 @tailwind utilities;
 
 :root {
-  --navy: #0a1628;
-  --navy-light: #1e3a5f;
-  --red: #e63946;
-  --gold: #f4a261;
+  --navy: #0a0f1e;
+  --navy-light: #0f172a;
+  --cyan: #06b6d4;
+  --cyan-glow: rgba(6, 182, 212, 0.15);
+}
+
+html, body {
+  background-color: #0a0f1e;
+  color: #f1f5f9;
 }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-.sidebar-link {
-  @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150;
+/* Dark scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #0f172a; }
+::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+/* Hide scrollbar but keep scroll */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Dark select options */
+select option {
+  background-color: #1e293b;
+  color: #f1f5f9;
 }
 
-.sidebar-link:hover {
-  @apply bg-white/10 text-white;
-}
-
-.sidebar-link.active {
-  @apply bg-white/15 text-white;
-}
-
-.btn-primary {
-  @apply inline-flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm font-semibold transition-all;
-  background: var(--navy);
-}
-
-.btn-primary:hover {
-  background: var(--navy-light);
+/* Input autofill dark */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 30px #1e293b inset !important;
+  -webkit-text-fill-color: #f1f5f9 !important;
 }
 
 .card {
-  @apply bg-white rounded-2xl border border-gray-100 shadow-sm;
+  @apply bg-slate-800/60 rounded-2xl border border-slate-700/50;
 }
 
 .badge {
   @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
 }
-
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #f1f5f9; }
-::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }

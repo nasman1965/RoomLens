@@ -344,7 +344,7 @@ function SettingsContent() {
   // ─── Loading splash ──────────────────────────────────────────────────────────
   if (loadingProfile) {
     return (
-      <div className="flex items-center justify-center h-full min-h-[400px]">
+      <div className="flex items-center justify-center h-full min-h-screen bg-[#0a0f1e]">
         <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
       </div>
     );
@@ -434,7 +434,7 @@ function SettingsContent() {
                     placeholder="Smith Restoration Inc." className={input} />
                 </Field>
                 <button type="submit" disabled={savingProfile}
-                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white font-semibold py-2.5 px-6 rounded-lg transition text-sm">
+                  className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 disabled:bg-blue-800 text-white font-semibold py-2.5 px-6 rounded-lg transition text-sm">
                   {savingProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   Save Profile
                 </button>
@@ -453,7 +453,7 @@ function SettingsContent() {
                 <p className="text-slate-400 text-sm mt-1">Employees who can be assigned to jobs</p>
               </div>
               <button type="button" onClick={openAdd}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition">
+                className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition">
                 <Plus className="w-4 h-4" /> Add Employee
               </button>
             </div>
@@ -525,7 +525,7 @@ function SettingsContent() {
 
                   <div className="flex gap-2 pt-1">
                     <button type="submit" disabled={savingMember}
-                      className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white font-semibold py-2 px-5 rounded-lg transition text-sm">
+                      className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 disabled:bg-blue-800 text-white font-semibold py-2 px-5 rounded-lg transition text-sm">
                       {savingMember ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                       {editId ? 'Update Member' : 'Create & Send Invite'}
                     </button>
@@ -621,7 +621,7 @@ function SettingsContent() {
                 <p className="text-slate-400 font-medium">No team members yet</p>
                 <p className="text-slate-500 text-sm mt-1">Add employees to enable dropdowns in job creation</p>
                 <button type="button" onClick={openAdd}
-                  className="mt-4 inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+                  className="mt-4 inline-flex items-center gap-1.5 bg-cyan-500 hover:bg-cyan-400 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
                   <Plus className="w-4 h-4" /> Add First Employee
                 </button>
               </div>
@@ -690,7 +690,7 @@ function SettingsContent() {
                   <p className="text-2xl font-bold text-white mt-1">{p.price}<span className="text-slate-400 text-sm font-normal">/mo</span></p>
                   <p className="text-slate-400 text-xs mt-2 mb-4">{p.desc}</p>
                   <button type="button"
-                    className={`w-full py-2 rounded-lg text-sm font-semibold transition ${p.highlight ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'border border-slate-600 text-slate-300 hover:border-slate-500 hover:text-white'}`}>
+                    className={`w-full py-2 rounded-lg text-sm font-semibold transition ${p.highlight ? 'bg-cyan-500 hover:bg-cyan-400 text-white' : 'border border-slate-600 text-slate-300 hover:border-slate-500 hover:text-white'}`}>
                     {profile?.subscription_tier === p.tier ? 'Current Plan' : 'Upgrade'}
                   </button>
                 </div>
@@ -757,7 +757,7 @@ function SettingsContent() {
             </div>
 
             <button type="button" onClick={saveNotifications} disabled={savingNotifs}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white font-semibold py-2.5 px-6 rounded-lg transition text-sm">
+              className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 disabled:bg-blue-800 text-white font-semibold py-2.5 px-6 rounded-lg transition text-sm">
               {savingNotifs ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               Save Preferences
             </button>
@@ -798,7 +798,7 @@ function SettingsContent() {
                     onChange={e => setConfirmPw(e.target.value)} placeholder="Repeat new password" className={input} />
                 </Field>
                 <button type="submit" disabled={savingPw}
-                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white font-semibold py-2.5 px-6 rounded-lg transition text-sm">
+                  className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 disabled:bg-blue-800 text-white font-semibold py-2.5 px-6 rounded-lg transition text-sm">
                   {savingPw ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
                   Update Password
                 </button>
@@ -894,7 +894,7 @@ function SettingsContent() {
                             <button type="button"
                               onClick={() => connectApp(app.id)}
                               disabled={savingKey === app.id || !apiKeys[app.id]?.trim()}
-                              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-semibold rounded-lg transition whitespace-nowrap">
+                              className="px-4 py-2.5 bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-semibold rounded-lg transition whitespace-nowrap">
                               {savingKey === app.id ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Connect'}
                             </button>
                           </div>

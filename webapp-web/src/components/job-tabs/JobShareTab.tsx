@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Share2, Link, Copy, Check, Plus, Trash2, Loader2, ExternalLink, Eye, Users, UserCheck } from 'lucide-react';
+import { Share2, Link, Copy, Check, Plus, Trash2, Loader2, ExternalLink, Eye, Users } from 'lucide-react';
 
 interface ShareLink {
   id: string; token: string; label: string;
@@ -13,15 +13,15 @@ interface TeamMember {
 }
 
 export default function JobShareTab({ jobId, userId }: { jobId: string; userId: string }) {
-  const [links, setLinks] = useState<ShareLink[]>([]);
-  const [members, setMembers] = useState<TeamMember[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [links, setLinks]       = useState<ShareLink[]>([]);
+  const [members, setMembers]   = useState<TeamMember[]>([]);
+  const [loading, setLoading]   = useState(true);
   const [creating, setCreating] = useState(false);
-  const [copied, setCopied] = useState<string | null>(null);
+  const [copied, setCopied]     = useState<string | null>(null);
   const [newLabel, setNewLabel] = useState('Adjuster Link');
   const [showNewForm, setShowNewForm] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [error, setError]       = useState('');
+  const [success, setSuccess]   = useState('');
 
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://roomlenspro.com';
 
@@ -72,47 +72,47 @@ export default function JobShareTab({ jobId, userId }: { jobId: string; userId: 
     window.open(`mailto:${member.email}?subject=Job File - RoomLens Pro&body=Hi ${member.full_name.split(' ')[0]},%0A%0AHere is the job file link:%0A${url}%0A%0AThis link gives read-only access to the job details, photos, moisture map and floor plans.%0A%0AThank you.`);
   };
 
-  if (loading) return <div className="flex items-center justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-blue-500" /></div>;
+  if (loading) return <div className="flex items-center justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-cyan-500" /></div>;
 
   return (
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-base font-semibold text-gray-900">Share Job File</h3>
-          <p className="text-sm text-gray-500 mt-0.5">Create read-only links for adjusters, staff, or management</p>
+          <h3 className="text-base font-semibold text-white">Share Job File</h3>
+          <p className="text-sm text-slate-400 mt-0.5">Create read-only links for adjusters, staff, or management</p>
         </div>
         <button onClick={() => setShowNewForm(!showNewForm)}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+          className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-slate-900 text-sm font-bold px-4 py-2 rounded-xl transition shadow-lg shadow-cyan-500/20">
           <Plus className="w-4 h-4" /> Create Link
         </button>
       </div>
 
-      {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-3">{error}</div>}
-      {success && <div className="bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg p-3">{success}</div>}
+      {error && <div className="bg-red-900/30 border border-red-700/40 text-red-300 text-sm rounded-xl p-3">{error}</div>}
+      {success && <div className="bg-emerald-900/30 border border-emerald-700/40 text-emerald-300 text-sm rounded-xl p-3">{success}</div>}
 
       {/* New link form */}
       {showNewForm && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-          <h4 className="text-sm font-semibold text-gray-800 mb-3">New Share Link</h4>
+        <div className="bg-slate-800/80 border border-slate-600/40 rounded-2xl p-4">
+          <h4 className="text-sm font-semibold text-white mb-3">New Share Link</h4>
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="block text-xs font-medium text-gray-600 mb-1">Link Label</label>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Link Label</label>
               <input type="text" value={newLabel} onChange={e => setNewLabel(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none"
+                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-xl text-sm text-white outline-none focus:ring-1 focus:ring-cyan-500 placeholder-slate-500"
                 placeholder="e.g. Adjuster Link, TD Insurance, Field Tech" />
             </div>
             <div className="flex items-end">
               <button onClick={createLink} disabled={creating || !newLabel.trim()}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+                className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-600 text-slate-900 disabled:text-slate-400 text-sm font-bold px-4 py-2 rounded-xl transition">
                 {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link className="w-4 h-4" />} Generate
               </button>
             </div>
           </div>
-          <div className="mt-3 flex gap-2">
+          <div className="mt-3 flex gap-2 flex-wrap">
             {['Adjuster Link', 'TD Insurance', 'Intact Financial', 'Field Tech', 'Management'].map(preset => (
               <button key={preset} onClick={() => setNewLabel(preset)}
-                className="text-xs px-2 py-1 bg-white border border-gray-200 rounded-full hover:border-blue-400 text-gray-600 transition">
+                className="text-xs px-2.5 py-1 bg-slate-700/50 border border-slate-600/40 rounded-full hover:border-cyan-500/50 hover:text-cyan-400 text-slate-400 transition">
                 {preset}
               </button>
             ))}
@@ -122,10 +122,10 @@ export default function JobShareTab({ jobId, userId }: { jobId: string; userId: 
 
       {/* Share links list */}
       {links.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-          <Share2 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 font-medium">No share links yet</p>
-          <p className="text-sm text-gray-400 mt-1">Create a link to share this job with adjusters, staff or management</p>
+        <div className="text-center py-12 bg-slate-800/40 rounded-2xl border border-dashed border-slate-600/40">
+          <Share2 className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+          <p className="text-slate-400 font-medium">No share links yet</p>
+          <p className="text-sm text-slate-500 mt-1">Create a link to share this job with adjusters, staff or management</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -133,51 +133,55 @@ export default function JobShareTab({ jobId, userId }: { jobId: string; userId: 
             const url = `${baseUrl}/share/${link.token}`;
             const isCopied = copied === link.token;
             return (
-              <div key={link.id} className="bg-white border border-gray-200 rounded-xl p-4">
+              <div key={link.id} className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-semibold text-gray-900">{link.label}</span>
-                      <span className="flex items-center gap-1 text-[10px] text-gray-400">
+                      <span className="text-sm font-semibold text-white">{link.label}</span>
+                      <span className="flex items-center gap-1 text-[10px] text-slate-500">
                         <Eye className="w-3 h-3" /> {link.access_count} views
                       </span>
                       {link.last_accessed && (
-                        <span className="text-[10px] text-gray-400">· last {new Date(link.last_accessed).toLocaleDateString()}</span>
+                        <span className="text-[10px] text-slate-500">· last {new Date(link.last_accessed).toLocaleDateString()}</span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <code className="text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded border border-gray-100 truncate max-w-xs">{url}</code>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <code className="text-xs text-slate-500 bg-slate-700/50 px-2 py-1 rounded-lg border border-slate-600/40 truncate max-w-xs">{url}</code>
                       <button onClick={() => copyLink(link.token)}
-                        className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg border transition ${isCopied ? 'bg-green-50 border-green-200 text-green-700' : 'bg-white border-gray-200 text-gray-600 hover:border-blue-400 hover:text-blue-600'}`}>
+                        className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg border transition ${
+                          isCopied
+                            ? 'bg-emerald-900/30 border-emerald-700/40 text-emerald-300'
+                            : 'bg-slate-700/50 border-slate-600/40 text-slate-400 hover:border-cyan-500/50 hover:text-cyan-400'
+                        }`}>
                         {isCopied ? <><Check className="w-3 h-3" /> Copied!</> : <><Copy className="w-3 h-3" /> Copy</>}
                       </button>
                       <a href={url} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-xs text-blue-600 hover:underline px-2 py-1">
+                        className="flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 px-2 py-1 transition">
                         <ExternalLink className="w-3 h-3" /> Preview
                       </a>
                     </div>
                   </div>
-                  <button onClick={() => deleteLink(link.id)} className="p-1.5 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition">
+                  <button onClick={() => deleteLink(link.id)} className="p-1.5 text-slate-600 hover:text-red-400 hover:bg-red-900/20 rounded-xl transition">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
                 {/* Send to staff */}
                 {members.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-gray-100">
-                    <p className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1"><Users className="w-3 h-3" /> Send to staff:</p>
+                  <div className="mt-3 pt-3 border-t border-slate-700/40">
+                    <p className="text-xs font-medium text-slate-500 mb-2 flex items-center gap-1"><Users className="w-3 h-3" /> Send to staff:</p>
                     <div className="flex flex-wrap gap-2">
                       {members.slice(0, 6).map(m => (
                         <div key={m.id} className="flex items-center gap-1">
-                          <span className="text-xs text-gray-600 font-medium">{m.full_name.split(' ')[0]}</span>
+                          <span className="text-xs text-slate-400 font-medium">{m.full_name.split(' ')[0]}</span>
                           {m.cell_phone && (
                             <button onClick={() => sendSMS(m, link.token)}
-                              className="text-[10px] px-1.5 py-0.5 bg-green-50 border border-green-200 text-green-700 rounded-full hover:bg-green-100 transition">
+                              className="text-[10px] px-1.5 py-0.5 bg-emerald-900/30 border border-emerald-700/40 text-emerald-300 rounded-full hover:bg-emerald-900/50 transition">
                               SMS
                             </button>
                           )}
                           {m.email && (
                             <button onClick={() => sendEmail(m, link.token)}
-                              className="text-[10px] px-1.5 py-0.5 bg-blue-50 border border-blue-200 text-blue-700 rounded-full hover:bg-blue-100 transition">
+                              className="text-[10px] px-1.5 py-0.5 bg-cyan-900/30 border border-cyan-700/40 text-cyan-300 rounded-full hover:bg-cyan-900/50 transition">
                               Email
                             </button>
                           )}
@@ -193,9 +197,9 @@ export default function JobShareTab({ jobId, userId }: { jobId: string; userId: 
       )}
 
       {/* Access levels info */}
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-        <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">What share links include</h4>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-gray-600">
+      <div className="bg-slate-800/40 border border-slate-700/40 rounded-2xl p-4">
+        <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">What share links include</h4>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-slate-400">
           {[
             { icon: '📋', label: 'Job overview & status' },
             { icon: '📷', label: 'All job photos' },

@@ -62,26 +62,26 @@ interface TeamMember {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const STATUS_BADGE: Record<string, string> = {
-  new: 'bg-blue-100 text-blue-700', dispatched: 'bg-purple-100 text-purple-700',
+  new: 'bg-blue-100 text-cyan-300', dispatched: 'bg-purple-100 text-purple-700',
   active: 'bg-green-100 text-green-700', review: 'bg-yellow-100 text-yellow-700',
-  closed: 'bg-gray-100 text-gray-500', draft: 'bg-gray-100 text-gray-400',
+  closed: 'bg-slate-700/50 text-slate-500', draft: 'bg-slate-700/50 text-slate-600',
   stopped: 'bg-red-100 text-red-700',
 };
 const JOB_TYPE_ICON: Record<string, string> = {
   water_loss: '💧', fire_loss: '🔥', mold: '🌿', large_loss: '🏗️', other: '📋',
 };
 const LEAD_SOURCE_ICONS: Record<string, { icon: string; label: string; color: string }> = {
-  manual:        { icon: '✏️', label: 'Manual Entry',      color: 'bg-gray-100 text-gray-700'   },
-  phone:         { icon: '📞', label: 'Phone Call',         color: 'bg-blue-100 text-blue-700'   },
+  manual:        { icon: '✏️', label: 'Manual Entry',      color: 'bg-slate-700/50 text-slate-300'   },
+  phone:         { icon: '📞', label: 'Phone Call',         color: 'bg-blue-100 text-cyan-300'   },
   ppc_ad:        { icon: '🎯', label: 'PPC Ad (Google/Meta)', color: 'bg-orange-100 text-orange-700' },
   xactanalysis:  { icon: '📊', label: 'Xactanalysis',       color: 'bg-purple-100 text-purple-700'},
   referral:      { icon: '🤝', label: 'Referral',           color: 'bg-green-100 text-green-700' },
   repeat_client: { icon: '⭐', label: 'Repeat Client',      color: 'bg-yellow-100 text-yellow-700'},
-  other:         { icon: '📋', label: 'Other',              color: 'bg-gray-100 text-gray-600'   },
+  other:         { icon: '📋', label: 'Other',              color: 'bg-slate-700/50 text-slate-400'   },
 };
 const WORK_AUTH_STATUS: Record<string, { label: string; color: string; icon: string }> = {
-  pending:  { label: 'Not Sent',    color: 'bg-gray-100 text-gray-500',    icon: '⏳' },
-  sent:     { label: 'Sent',        color: 'bg-blue-100 text-blue-700',    icon: '📤' },
+  pending:  { label: 'Not Sent',    color: 'bg-slate-700/50 text-slate-500',    icon: '⏳' },
+  sent:     { label: 'Sent',        color: 'bg-blue-100 text-cyan-300',    icon: '📤' },
   viewed:   { label: 'Viewed',      color: 'bg-yellow-100 text-yellow-700',icon: '👁️' },
   signed:   { label: 'Signed ✓',   color: 'bg-green-100 text-green-700',  icon: '✅' },
   declined: { label: 'Declined',    color: 'bg-red-100 text-red-700',      icon: '❌' },
@@ -124,7 +124,7 @@ function ContactActions({ phone, email, name }: { phone?: string | null; email?:
       {phone && (
         <>
           <a href={`tel:${phone}`}
-            className="flex items-center gap-1.5 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium px-3 py-1.5 rounded-lg transition border border-blue-200">
+            className="flex items-center gap-1.5 text-xs bg-cyan-500/10 hover:bg-blue-100 text-cyan-300 font-medium px-3 py-1.5 rounded-lg transition border border-blue-200">
             <PhoneCall className="w-3 h-3" /> Call
           </a>
           <a href={`sms:${phone}${name ? `?body=Hi ${name.split(' ')[0]}, this is regarding your restoration file.` : ''}`}
@@ -147,10 +147,10 @@ function ContactActions({ phone, email, name }: { phone?: string | null; email?:
 function InfoRow({ icon: Icon, label, value, mono = false }: { icon: React.ElementType; label: string; value: React.ReactNode; mono?: boolean }) {
   return (
     <div className="flex items-start gap-3 py-2.5 border-b border-gray-50 last:border-0">
-      <Icon className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+      <Icon className="w-4 h-4 text-slate-600 mt-0.5 shrink-0" />
       <div className="flex-1 min-w-0">
-        <p className="text-xs text-gray-400 font-medium mb-0.5">{label}</p>
-        <div className={`text-sm text-gray-800 font-medium ${mono ? 'font-mono' : ''}`}>{value}</div>
+        <p className="text-xs text-slate-600 font-medium mb-0.5">{label}</p>
+        <div className={`text-sm text-slate-200 font-medium ${mono ? 'font-mono' : ''}`}>{value}</div>
       </div>
     </div>
   );
@@ -170,7 +170,7 @@ function EmployeeSelect({
 }) {
   return (
     <div className="relative">
-      <Users className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+      <Users className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600 pointer-events-none" />
       <select
         value={selectedId}
         onChange={e => {
@@ -187,7 +187,7 @@ function EmployeeSelect({
           </option>
         ))}
       </select>
-      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600 pointer-events-none" />
     </div>
   );
 }
@@ -563,15 +563,15 @@ export default function JobDetailPage() {
 
   // ─── Render ─────────────────────────────────────────────────────────────────
   if (loading) return (
-    <div className="flex items-center justify-center h-full min-h-[400px]">
-      <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+    <div className="flex items-center justify-center h-full min-h-screen bg-[#0a0f1e]">
+      <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
     </div>
   );
   if (error || !job) return (
     <div className="p-6 max-w-2xl mx-auto text-center">
       <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-      <p className="text-gray-600">{error || 'Job not found.'}</p>
-      <Link href="/jobs" className="text-blue-600 hover:underline text-sm mt-2 inline-block">← Back to Jobs</Link>
+      <p className="text-slate-400">{error || 'Job not found.'}</p>
+      <Link href="/jobs" className="text-cyan-400 hover:underline text-sm mt-2 inline-block">← Back to Jobs</Link>
     </div>
   );
 
@@ -593,12 +593,12 @@ export default function JobDetailPage() {
                   <StopCircle className="w-5 h-5 text-red-600" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-gray-900">Stop This Job</h2>
-                  <p className="text-xs text-gray-500">Select a reason — this will flag the job and halt workflow progression.</p>
+                  <h2 className="text-lg font-bold text-white">Stop This Job</h2>
+                  <p className="text-xs text-slate-500">Select a reason — this will flag the job and halt workflow progression.</p>
                 </div>
               </div>
               <button type="button" onClick={() => setShowStopModal(false)} onKeyDown={e => { if (e.key === ' ') e.preventDefault(); }}
-                className="p-1.5 hover:bg-gray-100 rounded-lg transition"><X className="w-5 h-5 text-gray-400" /></button>
+                className="p-1.5 hover:bg-slate-700/50 rounded-lg transition"><X className="w-5 h-5 text-slate-600" /></button>
             </div>
 
             {/* Reason grid */}
@@ -610,18 +610,18 @@ export default function JobDetailPage() {
                   className={`text-left p-3 rounded-xl border-2 transition ${
                     stopForm.stop_reason === r.value
                       ? 'border-red-400 bg-red-50'
-                      : 'border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-white'
+                      : 'border-slate-700/50 bg-slate-700/30 hover:border-gray-300 hover:bg-white'
                   }`}>
                   <div className="text-xl mb-1">{r.icon}</div>
-                  <p className={`text-sm font-semibold ${stopForm.stop_reason === r.value ? 'text-red-700' : 'text-gray-800'}`}>{r.label}</p>
-                  <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">{r.description}</p>
+                  <p className={`text-sm font-semibold ${stopForm.stop_reason === r.value ? 'text-red-700' : 'text-slate-200'}`}>{r.label}</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5 leading-tight">{r.description}</p>
                 </button>
               ))}
             </div>
 
             {/* Notes */}
             <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Additional Notes (optional)</label>
+              <label className="text-xs font-medium text-slate-400 mb-1 block">Additional Notes (optional)</label>
               <textarea value={stopForm.stop_notes}
                 onChange={e => setStopForm(p => ({ ...p, stop_notes: e.target.value }))}
                 rows={3} placeholder="Any additional context about why this job is being stopped…"
@@ -639,7 +639,7 @@ export default function JobDetailPage() {
               </button>
               <button type="button" onClick={() => setShowStopModal(false)}
                 onKeyDown={e => { if (e.key === ' ') e.preventDefault(); }}
-                className="px-5 py-2.5 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50 transition">
+                className="px-5 py-2.5 border border-gray-300 text-slate-400 text-sm rounded-lg hover:bg-slate-700/30 transition">
                 Cancel
               </button>
             </div>
@@ -657,12 +657,12 @@ export default function JobDetailPage() {
                   <CheckCircle className="w-5 h-5 text-green-600" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-gray-900">Override — Re-activate Job</h2>
-                  <p className="text-xs text-gray-500">Explain why this stopped job should continue.</p>
+                  <h2 className="text-lg font-bold text-white">Override — Re-activate Job</h2>
+                  <p className="text-xs text-slate-500">Explain why this stopped job should continue.</p>
                 </div>
               </div>
               <button type="button" onClick={() => setShowOverrideModal(false)} onKeyDown={e => { if (e.key === ' ') e.preventDefault(); }}
-                className="p-1.5 hover:bg-gray-100 rounded-lg transition"><X className="w-5 h-5 text-gray-400" /></button>
+                className="p-1.5 hover:bg-slate-700/50 rounded-lg transition"><X className="w-5 h-5 text-slate-600" /></button>
             </div>
 
             {job.stop_reason && (
@@ -674,7 +674,7 @@ export default function JobDetailPage() {
             )}
 
             <div>
-              <label className="text-xs font-medium text-gray-700 mb-1 block">Override Reason <span className="text-red-500">*</span></label>
+              <label className="text-xs font-medium text-slate-300 mb-1 block">Override Reason <span className="text-red-500">*</span></label>
               <textarea value={overrideReason}
                 onChange={e => setOverrideReason(e.target.value)}
                 rows={3} placeholder="e.g. Client confirmed they want full restoration after reviewing estimate…"
@@ -691,7 +691,7 @@ export default function JobDetailPage() {
               </button>
               <button type="button" onClick={() => setShowOverrideModal(false)}
                 onKeyDown={e => { if (e.key === ' ') e.preventDefault(); }}
-                className="px-5 py-2.5 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50 transition">
+                className="px-5 py-2.5 border border-gray-300 text-slate-400 text-sm rounded-lg hover:bg-slate-700/30 transition">
                 Cancel
               </button>
             </div>
@@ -701,15 +701,15 @@ export default function JobDetailPage() {
 
       {/* ── Header ── */}
       <div className="flex items-start gap-3">
-        <Link href="/jobs" className="p-2 hover:bg-gray-100 rounded-lg transition mt-1">
-          <ArrowLeft className="w-5 h-5 text-gray-600" />
+        <Link href="/jobs" className="p-2 hover:bg-slate-700/50 rounded-lg transition mt-1">
+          <ArrowLeft className="w-5 h-5 text-slate-400" />
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-2xl font-bold text-white">
               {JOB_TYPE_ICON[job.job_type]} {job.insured_name}
             </h1>
-            <span className={`text-sm font-medium px-3 py-1 rounded-full capitalize ${STATUS_BADGE[job.status] || 'bg-gray-100 text-gray-600'}`}>
+            <span className={`text-sm font-medium px-3 py-1 rounded-full capitalize ${STATUS_BADGE[job.status] || 'bg-slate-700/50 text-slate-400'}`}>
               {job.status}
             </span>
             {job.override_active && (
@@ -718,7 +718,7 @@ export default function JobDetailPage() {
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1 text-gray-500 text-sm mt-1">
+          <div className="flex items-center gap-1 text-slate-500 text-sm mt-1">
             <MapPin className="w-3.5 h-3.5" />
             {job.property_address}{job.property_city ? `, ${job.property_city}` : ''}{job.property_postal_code ? ` ${job.property_postal_code}` : ''}
           </div>
@@ -791,7 +791,7 @@ export default function JobDetailPage() {
       )}
 
       {/* ── Job Hub Tab Bar ── */}
-      <div className="border-b border-gray-200 bg-white sticky top-0 z-10 -mx-6 px-6">
+      <div className="border-b border-slate-700/50 bg-white sticky top-0 z-10 -mx-6 px-6">
         <div className="flex overflow-x-auto scrollbar-hide gap-1">
           {([
             { id: 'overview',   label: 'Overview',     icon: FileText  },
@@ -804,8 +804,8 @@ export default function JobDetailPage() {
               onClick={() => setActiveJobTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition shrink-0 ${
                 activeJobTab === tab.id
-                  ? 'border-blue-600 text-blue-700'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-blue-600 text-cyan-300'
+                  : 'border-transparent text-slate-500 hover:text-slate-300 hover:border-gray-300'
               }`}>
               <tab.icon className="w-4 h-4" />
               {tab.label}
@@ -828,7 +828,7 @@ export default function JobDetailPage() {
         href={`/jobs/${job.id}/carrier`}
         className={`flex items-center justify-between gap-3 rounded-xl border-2 p-4 transition hover:shadow-md ${
           job.carrier_slug
-            ? 'bg-blue-50 border-blue-300 hover:bg-blue-100'
+            ? 'bg-cyan-500/10 border-blue-300 hover:bg-blue-100'
             : 'bg-slate-50 border-dashed border-slate-300 hover:border-blue-400'
         }`}
       >
@@ -842,7 +842,7 @@ export default function JobDetailPage() {
             <p className={`font-bold text-sm ${job.carrier_slug ? 'text-blue-800' : 'text-slate-700'}`}>
               {job.carrier_slug ? '🛡️ Carrier Mode Active' : '🛡️ Activate Carrier Mode'}
             </p>
-            <p className={`text-xs mt-0.5 ${job.carrier_slug ? 'text-blue-600' : 'text-slate-500'}`}>
+            <p className={`text-xs mt-0.5 ${job.carrier_slug ? 'text-cyan-400' : 'text-slate-500'}`}>
               {job.carrier_slug
                 ? `${job.insurer_name || job.carrier_slug} — SLA timers, photo labels & checklist`
                 : 'Select carrier for SLA timers, photo requirements & compliance checklist'}
@@ -856,9 +856,9 @@ export default function JobDetailPage() {
       <StaffDispatchPanel jobId={job.id} adminUserId={userId} />
 
       {/* ── Clickable Step Tabs ── */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-slate-800/60 rounded-2xl border border-slate-700/50 overflow-hidden">
         {/* Tab row */}
-        <div className="flex overflow-x-auto border-b border-gray-100 bg-gray-50 scrollbar-hide">
+        <div className="flex overflow-x-auto border-b border-slate-700/30 bg-slate-700/30 scrollbar-hide">
           {STEP_META.map(step => {
             const status = getStepStatus(step.num);
             const isActive = activeStep === step.num;
@@ -872,23 +872,23 @@ export default function JobDetailPage() {
                 onKeyDown={e => { if (e.key === ' ' || e.key === 'Spacebar') e.preventDefault(); }}
                 className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium border-b-2 transition whitespace-nowrap ${
                   isActive
-                    ? 'border-blue-600 text-blue-700 bg-white'
+                    ? 'border-blue-600 text-cyan-300 bg-white'
                     : isComplete
                     ? 'border-green-400 text-green-700 hover:bg-white'
                     : isInProgress
-                    ? 'border-blue-400 text-blue-600 hover:bg-white'
-                    : 'border-transparent text-gray-400 hover:text-gray-600 hover:bg-white'
+                    ? 'border-blue-400 text-cyan-400 hover:bg-white'
+                    : 'border-transparent text-slate-600 hover:text-slate-400 hover:bg-white'
                 }`}
               >
                 <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
                   isComplete ? 'bg-green-500 text-white' :
-                  isInProgress ? 'bg-blue-500 text-white' :
-                  'bg-gray-200 text-gray-500'
+                  isInProgress ? 'bg-cyan-500/100 text-white' :
+                  'bg-gray-200 text-slate-500'
                 }`}>
                   {isComplete ? '✓' : step.num}
                 </span>
                 {step.label}
-                {isInProgress && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />}
+                {isInProgress && <span className="w-1.5 h-1.5 rounded-full bg-cyan-500/100 animate-pulse" />}
               </button>
             );
           })}
@@ -902,23 +902,23 @@ export default function JobDetailPage() {
             {activeStep === 1 && (
               <div className="space-y-5">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-gray-800 flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-blue-500" /> Step 1 — File Creation
-                    <span className="text-xs text-gray-400 font-normal">
+                  <h3 className="font-semibold text-slate-200 flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-cyan-400" /> Step 1 — File Creation
+                    <span className="text-xs text-slate-600 font-normal">
                       Created {new Date(job.created_at).toLocaleString()}
                     </span>
                   </h3>
                   <button type="button" onClick={() => setEditingStep(editingStep === 1 ? null : 1)}
                     onKeyDown={e => { if (e.key === ' ') e.preventDefault(); }}
-                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded-lg hover:bg-blue-50 transition">
+                    className="flex items-center gap-1 text-xs text-cyan-400 hover:text-blue-800 px-2 py-1 rounded-lg hover:bg-cyan-500/10 transition">
                     <Edit3 className="w-3.5 h-3.5" /> {editingStep === 1 ? 'Cancel' : 'Edit'}
                   </button>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {/* Lead Source card */}
-                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Lead Source</p>
+                  <div className="bg-slate-800/40 rounded-2xl p-4 border border-slate-700/30">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Lead Source</p>
                     {/* edit form – always mounted, hidden when not editing */}
                     <div className={editingStep === 1 ? 'space-y-3' : 'hidden'}>
                       <select value={step1Form.lead_source} onChange={e => setStep1Form(p => ({ ...p, lead_source: e.target.value }))}
@@ -938,17 +938,17 @@ export default function JobDetailPage() {
                         {ls.icon} {ls.label}
                       </span>
                       {job.lead_source_detail && (
-                        <p className="text-xs text-gray-500 mt-2">{job.lead_source_detail}</p>
+                        <p className="text-xs text-slate-500 mt-2">{job.lead_source_detail}</p>
                       )}
                     </div>
                   </div>
 
                   {/* File Created By — with employee dropdown */}
-                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                  <div className="bg-slate-800/40 rounded-2xl p-4 border border-slate-700/30">
                     <div className="flex items-center justify-between mb-3">
-                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">File Created By</p>
+                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">File Created By</p>
                       {teamMembers.length === 0 && editingStep !== 1 && (
-                        <Link href="/settings" className="text-xs text-blue-500 hover:underline flex items-center gap-1">
+                        <Link href="/settings" className="text-xs text-cyan-400 hover:underline flex items-center gap-1">
                           <Users className="w-3 h-3" /> Add team
                         </Link>
                       )}
@@ -957,7 +957,7 @@ export default function JobDetailPage() {
                     <div className={editingStep === 1 ? 'space-y-2' : 'hidden'}>
                       {teamMembers.length > 0 && (
                         <div>
-                          <label className="text-xs text-gray-500 mb-1 block">Select from your team</label>
+                          <label className="text-xs text-slate-500 mb-1 block">Select from your team</label>
                           <EmployeeSelect
                             members={teamMembers}
                             selectedId={step1Form.created_by_member_id}
@@ -972,7 +972,7 @@ export default function JobDetailPage() {
                             }}
                             placeholder="— Select team member —"
                           />
-                          <p className="text-[10px] text-gray-400 mt-1">Or fill manually below</p>
+                          <p className="text-[10px] text-slate-600 mt-1">Or fill manually below</p>
                         </div>
                       )}
                       <input type="text" value={step1Form.created_by_name}
@@ -994,25 +994,25 @@ export default function JobDetailPage() {
                         <div>
                           <div className="flex items-center gap-2 mb-1">
                             <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                              <User className="w-4 h-4 text-blue-600" />
+                              <User className="w-4 h-4 text-cyan-400" />
                             </div>
                             <div>
-                              <p className="text-sm font-semibold text-gray-800">{job.created_by_name}</p>
-                              {job.created_by_phone && <p className="text-xs text-gray-500">{job.created_by_phone}</p>}
+                              <p className="text-sm font-semibold text-slate-200">{job.created_by_name}</p>
+                              {job.created_by_phone && <p className="text-xs text-slate-500">{job.created_by_phone}</p>}
                             </div>
                           </div>
                           <ContactActions phone={job.created_by_phone} email={job.created_by_email} name={job.created_by_name} />
                         </div>
                       ) : (
-                        <p className="text-sm text-gray-400 italic">Not recorded — click Edit to add staff info</p>
+                        <p className="text-sm text-slate-600 italic">Not recorded — click Edit to add staff info</p>
                       )}
                     </div>
                   </div>
                 </div>
 
                 {/* Insured summary */}
-                <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Insured / Client</p>
+                <div className="bg-slate-800/40 rounded-2xl p-4 border border-slate-700/30">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Insured / Client</p>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <InfoRow icon={User} label="Insured Name" value={job.insured_name} />
                     <InfoRow icon={Hash} label="Claim #" value={job.claim_number || <span className="text-gray-300">—</span>} mono />
@@ -1023,7 +1023,7 @@ export default function JobDetailPage() {
 
                 <div className={editingStep === 1 ? '' : 'hidden'}>
                   <button type="button" onClick={saveStep1} disabled={saving}
-                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition">
+                    className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 disabled:bg-gray-300 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition">
                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     Save File Creation Data
                   </button>
@@ -1031,7 +1031,7 @@ export default function JobDetailPage() {
 
                 {/* Advance button */}
                 {getStepStatus(1) !== 'complete' && (
-                  <div className="pt-2 border-t border-gray-100">
+                  <div className="pt-2 border-t border-slate-700/30">
                     <button type="button" onClick={() => advanceWorkflowStep(1)}
                       className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
                       <CheckCircle className="w-4 h-4" /> Mark Step 1 Complete → Move to Dispatch
@@ -1045,32 +1045,32 @@ export default function JobDetailPage() {
             {activeStep === 2 && (
               <div className="space-y-5">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                  <h3 className="font-semibold text-slate-200 flex items-center gap-2">
                     <Navigation className="w-4 h-4 text-purple-500" /> Step 2 — Dispatch
                     {job.dispatched_at && (
-                      <span className="text-xs text-gray-400 font-normal">
+                      <span className="text-xs text-slate-600 font-normal">
                         Dispatched {new Date(job.dispatched_at).toLocaleString()}
                       </span>
                     )}
                   </h3>
                   <button type="button" onClick={() => setEditingStep(editingStep === 2 ? null : 2)}
                     onKeyDown={e => { if (e.key === ' ') e.preventDefault(); }}
-                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded-lg hover:bg-blue-50 transition">
+                    className="flex items-center gap-1 text-xs text-cyan-400 hover:text-blue-800 px-2 py-1 rounded-lg hover:bg-cyan-500/10 transition">
                     <Edit3 className="w-3.5 h-3.5" /> {editingStep === 2 ? 'Cancel' : 'Edit'}
                   </button>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {/* Technician dispatched to */}
-                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                  <div className="bg-slate-800/40 rounded-2xl p-4 border border-slate-700/30">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
                       Technician / Team Assigned
                     </p>
                     {/* edit form – always mounted */}
                     <div className={editingStep === 2 ? 'space-y-2' : 'hidden'}>
                       {teamMembers.length > 0 && (
                         <div>
-                          <label className="text-xs text-gray-500 mb-1 block">Select from your team</label>
+                          <label className="text-xs text-slate-500 mb-1 block">Select from your team</label>
                           <EmployeeSelect
                             members={teamMembers}
                             selectedId={step2Form.dispatched_member_id}
@@ -1085,7 +1085,7 @@ export default function JobDetailPage() {
                             }}
                             placeholder="— Assign a technician —"
                           />
-                          <p className="text-[10px] text-gray-400 mt-1">Or fill manually below</p>
+                          <p className="text-[10px] text-slate-600 mt-1">Or fill manually below</p>
                         </div>
                       )}
                       <input type="text" value={step2Form.dispatched_to_name}
@@ -1110,15 +1110,15 @@ export default function JobDetailPage() {
                               <UserCheck className="w-4 h-4 text-purple-600" />
                             </div>
                             <div>
-                              <p className="text-sm font-semibold text-gray-800">{job.dispatched_to_name}</p>
-                              {job.dispatched_to_phone && <p className="text-xs text-gray-500">{job.dispatched_to_phone}</p>}
-                              {job.dispatched_to_email && <p className="text-xs text-gray-400">{job.dispatched_to_email}</p>}
+                              <p className="text-sm font-semibold text-slate-200">{job.dispatched_to_name}</p>
+                              {job.dispatched_to_phone && <p className="text-xs text-slate-500">{job.dispatched_to_phone}</p>}
+                              {job.dispatched_to_email && <p className="text-xs text-slate-600">{job.dispatched_to_email}</p>}
                             </div>
                           </div>
                           <ContactActions phone={job.dispatched_to_phone} email={job.dispatched_to_email} name={job.dispatched_to_name} />
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2 text-sm text-gray-400 italic">
+                        <div className="flex items-center gap-2 text-sm text-slate-600 italic">
                           <AlertTriangle className="w-4 h-4 text-yellow-400" />
                           Not dispatched yet — click Edit to assign a technician
                         </div>
@@ -1127,18 +1127,18 @@ export default function JobDetailPage() {
                   </div>
 
                   {/* Dispatch timing */}
-                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Dispatch Timing</p>
+                  <div className="bg-slate-800/40 rounded-2xl p-4 border border-slate-700/30">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Dispatch Timing</p>
                     {/* edit form - timing */}
                     <div className={editingStep === 2 ? 'space-y-2' : 'hidden'}>
                       <div>
-                        <label className="text-xs text-gray-500 mb-1 block">Dispatch Date & Time</label>
+                        <label className="text-xs text-slate-500 mb-1 block">Dispatch Date & Time</label>
                         <input type="datetime-local" value={step2Form.dispatched_at}
                           onChange={e => setStep2Form(p => ({ ...p, dispatched_at: e.target.value }))}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
                       </div>
                       <div>
-                        <label className="text-xs text-gray-500 mb-1 block">ETA (minutes)</label>
+                        <label className="text-xs text-slate-500 mb-1 block">ETA (minutes)</label>
                         <input type="number" min="0" value={step2Form.eta_minutes}
                           onChange={e => setStep2Form(p => ({ ...p, eta_minutes: e.target.value }))}
                           placeholder="e.g. 45"
@@ -1166,27 +1166,27 @@ export default function JobDetailPage() {
                 </div>
 
                 {/* Dispatch notes - always render textarea to keep focus stable */}
-                <div className={editingStep === 2 || job.dispatch_notes ? 'bg-gray-50 rounded-xl p-4 border border-gray-100' : 'hidden'}>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Dispatch Notes</p>
+                <div className={editingStep === 2 || job.dispatch_notes ? 'bg-slate-800/40 rounded-2xl p-4 border border-slate-700/30' : 'hidden'}>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Dispatch Notes</p>
                   <textarea value={step2Form.dispatch_notes}
                     onChange={e => setStep2Form(p => ({ ...p, dispatch_notes: e.target.value }))}
                     rows={3} placeholder="Special instructions, access code, lockbox, etc."
                     className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none ${editingStep !== 2 ? 'hidden' : ''}`} />
                   {editingStep !== 2 && job.dispatch_notes && (
-                    <p className="text-sm text-gray-700 leading-relaxed">{job.dispatch_notes}</p>
+                    <p className="text-sm text-slate-300 leading-relaxed">{job.dispatch_notes}</p>
                   )}
                 </div>
 
                 {/* Property for navigation */}
-                <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
-                  <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-2">Property Address</p>
-                  <p className="text-sm font-medium text-gray-800">
+                <div className="bg-cyan-500/10 rounded-xl p-4 border border-blue-100">
+                  <p className="text-xs font-semibold text-cyan-400 uppercase tracking-wide mb-2">Property Address</p>
+                  <p className="text-sm font-medium text-slate-200">
                     {job.property_address}{job.property_city ? `, ${job.property_city}` : ''}{job.property_postal_code ? ` ${job.property_postal_code}` : ''}
                   </p>
                   <a
                     href={`https://maps.google.com/?q=${encodeURIComponent([job.property_address, job.property_city].filter(Boolean).join(', '))}`}
                     target="_blank" rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 mt-2 text-xs bg-white hover:bg-blue-100 text-blue-700 font-medium px-3 py-1.5 rounded-lg border border-blue-200 transition">
+                    className="inline-flex items-center gap-1.5 mt-2 text-xs bg-white hover:bg-blue-100 text-cyan-300 font-medium px-3 py-1.5 rounded-lg border border-blue-200 transition">
                     <MapPin className="w-3 h-3" /> Open in Google Maps
                     <ExternalLink className="w-3 h-3" />
                   </a>
@@ -1201,7 +1201,7 @@ export default function JobDetailPage() {
                 </div>
 
                 {getStepStatus(2) !== 'complete' && (
-                  <div className="pt-2 border-t border-gray-100">
+                  <div className="pt-2 border-t border-slate-700/30">
                     <button type="button" onClick={() => advanceWorkflowStep(2)}
                       className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
                       <CheckCircle className="w-4 h-4" /> Mark Dispatched → Move to Work Authorization
@@ -1215,12 +1215,12 @@ export default function JobDetailPage() {
             {activeStep === 3 && (
               <div className="space-y-5">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                  <h3 className="font-semibold text-slate-200 flex items-center gap-2">
                     <Shield className="w-4 h-4 text-green-500" /> Step 3 — Work Authorization
                   </h3>
                   <button type="button" onClick={() => setEditingStep(editingStep === 3 ? null : 3)}
                     onKeyDown={e => { if (e.key === ' ') e.preventDefault(); }}
-                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded-lg hover:bg-blue-50 transition">
+                    className="flex items-center gap-1 text-xs text-cyan-400 hover:text-blue-800 px-2 py-1 rounded-lg hover:bg-cyan-500/10 transition">
                     <Edit3 className="w-3.5 h-3.5" /> {editingStep === 3 ? 'Cancel' : 'Edit Status'}
                   </button>
                 </div>
@@ -1229,21 +1229,21 @@ export default function JobDetailPage() {
                 <div className={`rounded-xl p-4 border-2 flex items-center gap-3 ${
                   job.work_auth_status === 'signed' ? 'bg-green-50 border-green-300' :
                   job.work_auth_status === 'declined' ? 'bg-red-50 border-red-300' :
-                  job.work_auth_status === 'sent' || job.work_auth_status === 'viewed' ? 'bg-blue-50 border-blue-300' :
-                  'bg-gray-50 border-gray-200'
+                  job.work_auth_status === 'sent' || job.work_auth_status === 'viewed' ? 'bg-cyan-500/10 border-blue-300' :
+                  'bg-slate-700/30 border-slate-700/50'
                 }`}>
                   <div className="text-3xl">{wa.icon}</div>
                   <div className="flex-1">
-                    <p className="font-semibold text-gray-800">Authorization Status: <span className={`px-2 py-0.5 rounded-full text-sm ${wa.color}`}>{wa.label}</span></p>
-                    {job.work_auth_sent_at && <p className="text-xs text-gray-500 mt-0.5">Sent: {new Date(job.work_auth_sent_at).toLocaleString()}</p>}
+                    <p className="font-semibold text-slate-200">Authorization Status: <span className={`px-2 py-0.5 rounded-full text-sm ${wa.color}`}>{wa.label}</span></p>
+                    {job.work_auth_sent_at && <p className="text-xs text-slate-500 mt-0.5">Sent: {new Date(job.work_auth_sent_at).toLocaleString()}</p>}
                     {job.work_auth_signed_at && <p className="text-xs text-green-600 mt-0.5">Signed: {new Date(job.work_auth_signed_at).toLocaleString()} {job.work_auth_signed_by ? `by ${job.work_auth_signed_by}` : ''}</p>}
                   </div>
                 </div>
 
                 {/* Step 3 edit form - always mounted to preserve focus */}
-                <div className={editingStep === 3 ? 'bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-3' : 'hidden'}>
+                <div className={editingStep === 3 ? 'bg-slate-800/40 rounded-2xl p-4 border border-slate-700/30 space-y-3' : 'hidden'}>
                     <div>
-                      <label className="text-xs font-medium text-gray-600 mb-1 block">Update Authorization Status</label>
+                      <label className="text-xs font-medium text-slate-400 mb-1 block">Update Authorization Status</label>
                       <select value={step3Form.work_auth_status}
                         onChange={e => setStep3Form(p => ({ ...p, work_auth_status: e.target.value }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
@@ -1254,7 +1254,7 @@ export default function JobDetailPage() {
                     </div>
                     {/* signed-by input - always rendered to keep focus stable */}
                     <div className={step3Form.work_auth_status === 'signed' ? '' : 'hidden'}>
-                      <label className="text-xs font-medium text-gray-600 mb-1 block">Signed By (name)</label>
+                      <label className="text-xs font-medium text-slate-400 mb-1 block">Signed By (name)</label>
                       <input type="text" value={step3Form.work_auth_signed_by}
                         onChange={e => setStep3Form(p => ({ ...p, work_auth_signed_by: e.target.value }))}
                         placeholder="e.g. John Peters"
@@ -1268,11 +1268,11 @@ export default function JobDetailPage() {
                   </div>
 
                 {/* Document upload */}
-                <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                <div className="bg-slate-800/40 rounded-2xl p-4 border border-slate-700/30">
                   <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Work Authorization Form (WAF)</p>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Work Authorization Form (WAF)</p>
                     <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploadingDoc}
-                      className="flex items-center gap-1.5 text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-medium px-3 py-1.5 rounded-lg transition">
+                      className="flex items-center gap-1.5 text-xs bg-cyan-500 hover:bg-cyan-400 disabled:bg-gray-300 text-white font-medium px-3 py-1.5 rounded-lg transition">
                       {uploadingDoc ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
                       {uploadingDoc ? 'Uploading…' : 'Upload WAF'}
                     </button>
@@ -1280,34 +1280,34 @@ export default function JobDetailPage() {
                   </div>
 
                   {wafDocs.length === 0 ? (
-                    <div className="text-center py-6 border-2 border-dashed border-gray-200 rounded-lg">
+                    <div className="text-center py-6 border-2 border-dashed border-slate-700/50 rounded-lg">
                       <PenTool className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                      <p className="text-sm text-gray-400">No WAF document uploaded yet</p>
+                      <p className="text-sm text-slate-600">No WAF document uploaded yet</p>
                       <p className="text-xs text-gray-300 mt-1">Upload a signed PDF, photo of signed form, or DocuSign document</p>
                     </div>
                   ) : (
                     <div className="space-y-2">
                       {wafDocs.map(doc => (
-                        <div key={doc.id} className="flex items-center gap-3 bg-white rounded-lg p-3 border border-gray-200">
-                          <FileText className="w-5 h-5 text-blue-500 shrink-0" />
+                        <div key={doc.id} className="flex items-center gap-3 bg-white rounded-lg p-3 border border-slate-700/50">
+                          <FileText className="w-5 h-5 text-cyan-400 shrink-0" />
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-800 truncate">{doc.file_name || 'Work Authorization Form'}</p>
+                            <p className="text-sm font-medium text-slate-200 truncate">{doc.file_name || 'Work Authorization Form'}</p>
                             <div className="flex items-center gap-2 mt-0.5">
                               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
                                 doc.signed_status === 'signed' ? 'bg-green-100 text-green-700' :
                                 doc.signed_status === 'declined' ? 'bg-red-100 text-red-700' :
-                                'bg-gray-100 text-gray-500'
+                                'bg-slate-700/50 text-slate-500'
                               }`}>{doc.signed_status.toUpperCase()}</span>
-                              <span className="text-xs text-gray-400">{new Date(doc.created_at).toLocaleDateString()}</span>
+                              <span className="text-xs text-slate-600">{new Date(doc.created_at).toLocaleDateString()}</span>
                             </div>
                           </div>
                           <div className="flex items-center gap-1">
                             <a href={doc.doc_url} target="_blank" rel="noreferrer"
-                              className="p-1.5 hover:bg-gray-100 rounded-lg transition text-gray-500 hover:text-blue-600">
+                              className="p-1.5 hover:bg-slate-700/50 rounded-lg transition text-slate-500 hover:text-cyan-400">
                               <Eye className="w-4 h-4" />
                             </a>
                             <a href={doc.doc_url} download
-                              className="p-1.5 hover:bg-gray-100 rounded-lg transition text-gray-500 hover:text-green-600">
+                              className="p-1.5 hover:bg-slate-700/50 rounded-lg transition text-slate-500 hover:text-green-600">
                               <Download className="w-4 h-4" />
                             </a>
                           </div>
@@ -1334,14 +1334,14 @@ export default function JobDetailPage() {
                         <MessageSquare className="w-3 h-3" /> SMS to Insured
                       </a>
                     )}
-                    <button type="button" className="flex items-center gap-1.5 text-xs bg-blue-500/30 hover:bg-blue-500/50 text-blue-200 font-medium px-3 py-1.5 rounded-lg border border-blue-400/30 transition">
+                    <button type="button" className="flex items-center gap-1.5 text-xs bg-cyan-500/100/30 hover:bg-cyan-500/100/50 text-blue-200 font-medium px-3 py-1.5 rounded-lg border border-blue-400/30 transition">
                       <PenTool className="w-3 h-3" /> DocuSign (coming soon)
                     </button>
                   </div>
                 </div>
 
                 {getStepStatus(3) !== 'complete' && (
-                  <div className="pt-2 border-t border-gray-100">
+                  <div className="pt-2 border-t border-slate-700/30">
                   <button type="button"
                       onClick={() => advanceWorkflowStep(3)}
                       disabled={job.work_auth_status !== 'signed'}
@@ -1359,8 +1359,8 @@ export default function JobDetailPage() {
             {activeStep !== null && activeStep > 3 && (
               <div className="py-8 text-center">
                 <div className="text-4xl mb-3">{STEP_META[activeStep - 1]?.label.split(' ')[0] === 'Invoice' ? '💰' : '🔧'}</div>
-                <p className="font-semibold text-gray-700 mb-1">Step {activeStep}: {STEP_META[activeStep - 1]?.label}</p>
-                <p className="text-sm text-gray-400 mb-4">
+                <p className="font-semibold text-slate-300 mb-1">Step {activeStep}: {STEP_META[activeStep - 1]?.label}</p>
+                <p className="text-sm text-slate-600 mb-4">
                   {getStepStatus(activeStep) === 'complete' ? '✅ This step has been completed.' :
                    getStepStatus(activeStep) === 'in_progress' ? '🔵 This step is currently in progress.' :
                    '⏳ This step is pending.'}
@@ -1379,15 +1379,15 @@ export default function JobDetailPage() {
       </div>
 
       {/* ── AI Notes Generator ── */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-slate-800/60 rounded-2xl border border-slate-700/50 overflow-hidden">
         {/* Header */}
-        <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-violet-50 to-blue-50">
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-700/30 bg-gradient-to-r from-violet-50 to-blue-50">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-blue-600 flex items-center justify-center shrink-0">
             <Sparkles className="w-4.5 h-4.5 text-white w-5 h-5" />
           </div>
           <div>
-            <h3 className="font-bold text-gray-900 text-sm">AI Notes Generator</h3>
-            <p className="text-xs text-gray-500">Type rough field notes → get clean professional text instantly</p>
+            <h3 className="font-bold text-white text-sm">AI Notes Generator</h3>
+            <p className="text-xs text-slate-500">Type rough field notes → get clean professional text instantly</p>
           </div>
         </div>
 
@@ -1410,7 +1410,7 @@ export default function JobDetailPage() {
 
           {/* Step 1 — Field Notes input */}
           <div>
-            <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
+            <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
               <NotebookPen className="w-3.5 h-3.5" /> Field Notes
             </label>
             <textarea
@@ -1418,7 +1418,7 @@ export default function JobDetailPage() {
               onChange={e => setFieldNotes(e.target.value)}
               rows={5}
               placeholder={`Paste or type rough tech notes here — bullets, fragments, anything…\n\nExample:\n- water came from 2nd floor bathroom\n- affected master bedroom ceiling and walls\n- cat 1 water loss, class 2\n- moisture readings 40-60% on drywall\n- extracted standing water approx 15 gallons`}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-violet-400 focus:border-violet-400 outline-none resize-none font-mono leading-relaxed text-gray-700 placeholder-gray-300"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-violet-400 focus:border-violet-400 outline-none resize-none font-mono leading-relaxed text-slate-300 placeholder-gray-300"
             />
           </div>
 
@@ -1437,14 +1437,14 @@ export default function JobDetailPage() {
               }
             </button>
             {!fieldNotes.trim() && (
-              <p className="text-xs text-gray-400">Type field notes above first</p>
+              <p className="text-xs text-slate-600">Type field notes above first</p>
             )}
           </div>
 
           {/* Step 2 — AI Result */}
           {(aiNotes || generatingNotes) && (
             <div className="space-y-3">
-              <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wide">
                 <Sparkles className="w-3.5 h-3.5 text-violet-500" /> AI-Generated Result
               </label>
 
@@ -1466,9 +1466,9 @@ export default function JobDetailPage() {
                     value={aiNotes}
                     onChange={e => setAiNotes(e.target.value)}
                     rows={7}
-                    className="w-full px-4 py-3 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-400 outline-none resize-none leading-relaxed text-gray-800 bg-violet-50/30"
+                    className="w-full px-4 py-3 border border-violet-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-400 outline-none resize-none leading-relaxed text-slate-200 bg-violet-50/30"
                   />
-                  <p className="text-[11px] text-gray-400">✏️ You can edit the text above before saving</p>
+                  <p className="text-[11px] text-slate-600">✏️ You can edit the text above before saving</p>
 
                   {/* Action buttons */}
                   <div className="flex items-center gap-3 pt-1">
@@ -1506,9 +1506,9 @@ export default function JobDetailPage() {
 
           {/* Current saved notes preview */}
           {job.notes && !aiNotes && (
-            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Current Saved Notes</p>
-              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{job.notes}</p>
+            <div className="bg-slate-800/40 rounded-2xl p-4 border border-slate-700/30">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Current Saved Notes</p>
+              <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{job.notes}</p>
               <button
                 type="button"
                 onClick={() => { setFieldNotes(job.notes || ''); setAiNotes(''); }}
@@ -1525,24 +1525,24 @@ export default function JobDetailPage() {
 
       {/* ── Details Grid (always visible below) ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <User className="w-4 h-4 text-blue-500" /> Insured
+        <div className="bg-slate-800/60 rounded-2xl border border-slate-700/50 p-5">
+          <h3 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
+            <User className="w-4 h-4 text-cyan-400" /> Insured
           </h3>
           <div className="space-y-1">
             <InfoRow icon={User} label="Name" value={job.insured_name} />
             {job.insured_phone && <InfoRow icon={Phone} label="Phone" value={
-              <a href={`tel:${job.insured_phone}`} className="text-blue-600 hover:underline">{job.insured_phone}</a>
+              <a href={`tel:${job.insured_phone}`} className="text-cyan-400 hover:underline">{job.insured_phone}</a>
             } />}
             {job.insured_email && <InfoRow icon={Mail} label="Email" value={
-              <a href={`mailto:${job.insured_email}`} className="text-blue-600 hover:underline">{job.insured_email}</a>
+              <a href={`mailto:${job.insured_email}`} className="text-cyan-400 hover:underline">{job.insured_email}</a>
             } />}
           </div>
           <ContactActions phone={job.insured_phone} email={job.insured_email} name={job.insured_name} />
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+        <div className="bg-slate-800/60 rounded-2xl border border-slate-700/50 p-5">
+          <h3 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
             <FileText className="w-4 h-4 text-green-500" /> Claim
           </h3>
           <div className="space-y-1">
@@ -1554,17 +1554,17 @@ export default function JobDetailPage() {
         </div>
 
         {(job.adjuster_name || job.adjuster_email || job.adjuster_phone) && (
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+          <div className="bg-slate-800/60 rounded-2xl border border-slate-700/50 p-5">
+            <h3 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
               <User className="w-4 h-4 text-orange-500" /> Adjuster
             </h3>
             <div className="space-y-1">
               {job.adjuster_name && <InfoRow icon={User} label="Name" value={job.adjuster_name} />}
               {job.adjuster_phone && <InfoRow icon={Phone} label="Phone" value={
-                <a href={`tel:${job.adjuster_phone}`} className="text-blue-600 hover:underline">{job.adjuster_phone}</a>
+                <a href={`tel:${job.adjuster_phone}`} className="text-cyan-400 hover:underline">{job.adjuster_phone}</a>
               } />}
               {job.adjuster_email && <InfoRow icon={Mail} label="Email" value={
-                <a href={`mailto:${job.adjuster_email}`} className="text-blue-600 hover:underline">{job.adjuster_email}</a>
+                <a href={`mailto:${job.adjuster_email}`} className="text-cyan-400 hover:underline">{job.adjuster_email}</a>
               } />}
             </div>
             <ContactActions phone={job.adjuster_phone} email={job.adjuster_email} name={job.adjuster_name} />
@@ -1572,14 +1572,14 @@ export default function JobDetailPage() {
         )}
 
         {job.notes && (
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h3 className="text-sm font-semibold text-gray-800 mb-2">Notes</h3>
-            <p className="text-sm text-gray-600 leading-relaxed">{job.notes}</p>
+          <div className="bg-slate-800/60 rounded-2xl border border-slate-700/50 p-5">
+            <h3 className="text-sm font-semibold text-slate-200 mb-2">Notes</h3>
+            <p className="text-sm text-slate-400 leading-relaxed">{job.notes}</p>
           </div>
         )}
       </div>
 
-      <div className="text-xs text-gray-400 flex gap-4 pb-4">
+      <div className="text-xs text-slate-600 flex gap-4 pb-4">
         <span>Created: {new Date(job.created_at).toLocaleString()}</span>
         <span>Updated: {new Date(job.updated_at).toLocaleString()}</span>
       </div>
@@ -1676,48 +1676,48 @@ function StaffDispatchPanel({ jobId, adminUserId }: { jobId: string; adminUserId
   };
 
   const STATUS_COLORS: Record<string,string> = {
-    dispatched: 'bg-blue-100 text-blue-700', accepted: 'bg-teal-100 text-teal-700',
+    dispatched: 'bg-blue-100 text-cyan-300', accepted: 'bg-teal-100 text-teal-700',
     in_progress: 'bg-yellow-100 text-yellow-700', completed: 'bg-green-100 text-green-700',
     declined: 'bg-red-100 text-red-700',
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div className="bg-slate-800/60 rounded-2xl border border-slate-700/50 overflow-hidden">
       <button onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition">
+        className="w-full flex items-center justify-between p-4 hover:bg-slate-700/30 transition">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-teal-100 flex items-center justify-center">
             <Users className="w-4 h-4 text-teal-600" />
           </div>
           <div className="text-left">
-            <p className="font-semibold text-sm text-gray-800">👷 Dispatch to Staff</p>
-            <p className="text-xs text-gray-500">
+            <p className="font-semibold text-sm text-slate-200">👷 Dispatch to Staff</p>
+            <p className="text-xs text-slate-500">
               {assignments.length > 0
                 ? `${assignments.length} staff assigned`
                 : 'Assign technicians to this job'}
             </p>
           </div>
         </div>
-        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 text-slate-600 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
-        <div className="border-t border-gray-100 p-4 space-y-4">
+        <div className="border-t border-slate-700/30 p-4 space-y-4">
           {/* Current assignments */}
           {assignments.length > 0 && (
             <div className="space-y-2">
               {assignments.map(a => (
-                <div key={a.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+                <div key={a.id} className="flex items-center justify-between bg-slate-700/30 rounded-lg px-3 py-2">
                   <div className="flex items-center gap-2">
                     <div className="w-7 h-7 rounded-full bg-teal-600 flex items-center justify-center text-white text-xs font-bold">
                       {a.member_name.charAt(0)}
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-800">{a.member_name}</p>
-                      {a.dispatch_notes && <p className="text-xs text-gray-500">{a.dispatch_notes}</p>}
+                      <p className="text-sm font-medium text-slate-200">{a.member_name}</p>
+                      {a.dispatch_notes && <p className="text-xs text-slate-500">{a.dispatch_notes}</p>}
                     </div>
                   </div>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUS_COLORS[a.status] || 'bg-gray-100 text-gray-600'}`}>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUS_COLORS[a.status] || 'bg-slate-700/50 text-slate-400'}`}>
                     {a.status.replace('_',' ').toUpperCase()}
                   </span>
                 </div>
@@ -1728,7 +1728,7 @@ function StaffDispatchPanel({ jobId, adminUserId }: { jobId: string; adminUserId
           {/* Assign new */}
           <div className="space-y-2">
             <select value={selectedMember} onChange={e => setSelectedMember(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white focus:ring-2 focus:ring-teal-500 outline-none">
+              className="w-full border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-slate-300 bg-white focus:ring-2 focus:ring-teal-500 outline-none">
               <option value="">— Select staff member —</option>
               {teamMembers
                 .filter(m => !assignments.find(a => a.member_id === m.id))
@@ -1740,14 +1740,14 @@ function StaffDispatchPanel({ jobId, adminUserId }: { jobId: string; adminUserId
             </select>
             <input type="text" value={dispatchNote} onChange={e => setDispatchNote(e.target.value)}
               placeholder="Dispatch notes (optional)..."
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:ring-2 focus:ring-teal-500 outline-none" />
+              className="w-full border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-slate-300 focus:ring-2 focus:ring-teal-500 outline-none" />
             <button onClick={dispatch} disabled={!selectedMember || saving}
               className="w-full flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 disabled:bg-gray-300 text-white text-sm font-semibold py-2 rounded-lg transition">
               <Send className="w-4 h-4" />
               {saving ? 'Dispatching...' : 'Dispatch to Staff'}
             </button>
             {teamMembers.filter(m => !assignments.find(a => a.member_id === m.id)).length === 0 && (
-              <p className="text-xs text-gray-400 text-center">
+              <p className="text-xs text-slate-600 text-center">
                 No staff with linked accounts yet. Go to Settings → Team to invite staff.
               </p>
             )}

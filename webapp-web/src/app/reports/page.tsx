@@ -43,8 +43,8 @@ const TYPE_LABELS: Record<string, string> = Object.fromEntries(
 );
 
 const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-600',
-  generated: 'bg-blue-100 text-blue-700',
+  draft: 'bg-slate-700/50 text-slate-400',
+  generated: 'bg-blue-100 text-cyan-300',
   sent: 'bg-purple-100 text-purple-700',
   approved: 'bg-green-100 text-green-700',
 };
@@ -270,8 +270,8 @@ export default function ReportsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      <div className="flex items-center justify-center h-full min-h-screen bg-[#0a0f1e]">
+        <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
       </div>
     );
   }
@@ -281,17 +281,17 @@ export default function ReportsPage() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <FileText className="w-6 h-6 text-blue-600" /> Reports
+          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <FileText className="w-6 h-6 text-cyan-400" /> Reports
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <p className="text-sm text-slate-500 mt-0.5">
             {reports.length} report{reports.length !== 1 ? 's' : ''} · {selectedJob?.insured_name || 'No job selected'}
           </p>
         </div>
         <button
           onClick={() => setShowNewReport(!showNewReport)}
           disabled={!selectedJobId}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition"
+          className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 disabled:bg-gray-300 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition"
         >
           <Plus className="w-4 h-4" /> Generate Report
         </button>
@@ -299,13 +299,13 @@ export default function ReportsPage() {
 
       {/* Alerts */}
       {error && (
-        <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-3">
+        <div className="flex items-center gap-2 bg-red-900/30 border border-red-700/40 text-red-300 text-sm rounded-lg p-3">
           <AlertCircle className="w-4 h-4 shrink-0" />{error}
           <button onClick={() => setError('')} className="ml-auto"><X className="w-4 h-4" /></button>
         </div>
       )}
       {success && (
-        <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg p-3">
+        <div className="flex items-center gap-2 bg-emerald-900/30 border border-emerald-700/40 text-emerald-300 text-sm rounded-lg p-3">
           <CheckCircle className="w-4 h-4 shrink-0" />{success}
         </div>
       )}
@@ -315,22 +315,22 @@ export default function ReportsPage() {
         <select
           value={selectedJobId}
           onChange={e => setSelectedJobId(e.target.value)}
-          className="appearance-none pl-3 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+          className="appearance-none pl-3 pr-8 py-2 border border-slate-600/50 rounded-xl bg-slate-700/50 text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white"
         >
           {jobs.length === 0 && <option value="">No jobs yet</option>}
           {jobs.map(j => (
             <option key={j.id} value={j.id}>{j.insured_name} — {j.property_address}</option>
           ))}
         </select>
-        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 pointer-events-none" />
       </div>
 
       {/* New Report Panel */}
       {showNewReport && (
-        <div className="bg-white rounded-xl border border-blue-200 p-5 space-y-4">
+        <div className="bg-white rounded-xl border border-cyan-700/40 p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-gray-800">Select Report Type</h3>
-            <button onClick={() => setShowNewReport(false)}><X className="w-4 h-4 text-gray-500" /></button>
+            <h3 className="font-semibold text-slate-200">Select Report Type</h3>
+            <button onClick={() => setShowNewReport(false)}><X className="w-4 h-4 text-slate-500" /></button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {REPORT_TYPES.map(rt => (
@@ -339,13 +339,13 @@ export default function ReportsPage() {
                 onClick={() => setSelectedType(rt.value)}
                 className={`text-left p-4 rounded-xl border-2 transition ${
                   selectedType === rt.value
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-200 hover:border-blue-300 bg-white'
+                    ? 'border-blue-500 bg-cyan-500/10'
+                    : 'border-slate-700/50 hover:border-blue-300 bg-white'
                 }`}
               >
                 <div className="text-2xl mb-2">{rt.icon}</div>
-                <div className="text-sm font-semibold text-gray-800 mb-1">{rt.label}</div>
-                <div className="text-xs text-gray-500 leading-snug">{rt.description}</div>
+                <div className="text-sm font-semibold text-slate-200 mb-1">{rt.label}</div>
+                <div className="text-xs text-slate-500 leading-snug">{rt.description}</div>
               </button>
             ))}
           </div>
@@ -362,26 +362,26 @@ export default function ReportsPage() {
 
       {/* Reports List */}
       {reports.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
+        <div className="bg-slate-800/60 rounded-2xl border border-slate-700/50 p-16 text-center">
           <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 font-medium mb-2">
+          <p className="text-slate-500 font-medium mb-2">
             {jobs.length === 0 ? 'Create a job first.' : 'No reports generated yet.'}
           </p>
-          <p className="text-sm text-gray-400">Click "Generate Report" to create your first report.</p>
+          <p className="text-sm text-slate-600">Click "Generate Report" to create your first report.</p>
         </div>
       ) : (
         <div className="space-y-3">
           {reports.map(report => (
-            <div key={report.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-4 hover:shadow-sm transition">
-              <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-                <FileText className="w-5 h-5 text-blue-600" />
+            <div key={report.id} className="bg-slate-800/60 rounded-2xl border border-slate-700/50 p-4 flex items-center gap-4 hover:shadow-sm transition">
+              <div className="w-10 h-10 rounded-lg bg-cyan-500/10 flex items-center justify-center shrink-0">
+                <FileText className="w-5 h-5 text-cyan-400" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-800 truncate">
+                <p className="text-sm font-semibold text-slate-200 truncate">
                   {TYPE_LABELS[report.report_type] || report.report_type}
                 </p>
                 <div className="flex items-center gap-3 mt-0.5">
-                  <span className="text-xs text-gray-400 flex items-center gap-1">
+                  <span className="text-xs text-slate-600 flex items-center gap-1">
                     <Clock className="w-3 h-3" />
                     {new Date(report.created_at).toLocaleString()}
                   </span>
@@ -390,16 +390,16 @@ export default function ReportsPage() {
               <div className="flex items-center gap-2 shrink-0">
                 {report.pdf_url && (
                   <a href={report.pdf_url} target="_blank" rel="noreferrer"
-                    className="p-2 hover:bg-gray-100 rounded-lg transition text-gray-500 hover:text-gray-700">
+                    className="p-2 hover:bg-slate-700/50 rounded-lg transition text-slate-500 hover:text-slate-300">
                     <Download className="w-4 h-4" />
                   </a>
                 )}
                 <button
                   onClick={() => {
                     const job = jobs.find(j => j.id === report.job_id);
-                    if (job) setPreviewReport({ job, type: report.report_type, content: '<p class="text-gray-500 text-sm p-8 text-center">Re-generate this report to view its content.</p>' });
+                    if (job) setPreviewReport({ job, type: report.report_type, content: '<p class="text-slate-500 text-sm p-8 text-center">Re-generate this report to view its content.</p>' });
                   }}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition text-gray-500 hover:text-blue-600"
+                  className="p-2 hover:bg-slate-700/50 rounded-lg transition text-slate-500 hover:text-cyan-400"
                 >
                   <Eye className="w-4 h-4" />
                 </button>
@@ -409,7 +409,7 @@ export default function ReportsPage() {
                     await supabase.from('reports').delete().eq('id', report.id);
                     setReports(prev => prev.filter(r => r.id !== report.id));
                   }}
-                  className="p-2 hover:bg-red-50 rounded-lg transition text-gray-400 hover:text-red-500"
+                  className="p-2 hover:bg-red-50 rounded-lg transition text-slate-600 hover:text-red-500"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -426,20 +426,20 @@ export default function ReportsPage() {
             className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-auto shadow-2xl"
             onClick={e => e.stopPropagation()}
           >
-            <div className="sticky top-0 bg-white border-b border-gray-200 flex items-center justify-between p-4 z-10">
-              <h3 className="font-semibold text-gray-800">{TYPE_LABELS[previewReport.type] || previewReport.type}</h3>
+            <div className="sticky top-0 bg-slate-800/60 border-b border-slate-700/50 flex items-center justify-between p-4 z-10">
+              <h3 className="font-semibold text-slate-200">{TYPE_LABELS[previewReport.type] || previewReport.type}</h3>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => printReport(previewReport.content)}
-                  className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-800 px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                  className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-200 px-3 py-1.5 border border-slate-600/50 rounded-xl bg-slate-700/50 text-white hover:bg-slate-700/30 transition"
                 >
                   <Printer className="w-4 h-4" /> Print / PDF
                 </button>
                 <button
                   onClick={() => setPreviewReport(null)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition"
+                  className="p-2 hover:bg-slate-700/50 rounded-lg transition"
                 >
-                  <X className="w-4 h-4 text-gray-500" />
+                  <X className="w-4 h-4 text-slate-500" />
                 </button>
               </div>
             </div>

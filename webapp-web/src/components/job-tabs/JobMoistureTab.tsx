@@ -18,14 +18,14 @@ interface GridCell {
 }
 
 const DRY_STD: Record<string, { wet: number; dry: number }> = {
-  drywall: { wet: 17, dry: 12 }, wood: { wet: 28, dry: 19 },
-  subfloor: { wet: 28, dry: 19 }, concrete: { wet: 5.5, dry: 4.0 },
-  ceiling: { wet: 17, dry: 12 }, carpet: { wet: 20, dry: 10 },
-  insulation: { wet: 25, dry: 15 }, tile: { wet: 4, dry: 2 }, other: { wet: 20, dry: 15 },
+  drywall:    { wet: 17, dry: 12 }, wood:       { wet: 28, dry: 19 },
+  subfloor:   { wet: 28, dry: 19 }, concrete:   { wet: 5.5, dry: 4.0 },
+  ceiling:    { wet: 17, dry: 12 }, carpet:     { wet: 20, dry: 10 },
+  insulation: { wet: 25, dry: 15 }, tile:       { wet: 4, dry: 2 },  other: { wet: 20, dry: 15 },
 };
 
 function cellColor(mc: number | null, mat: string): string {
-  if (mc === null) return 'rgba(243,244,246,0.7)';
+  if (mc === null) return 'rgba(30,41,59,0.5)';
   const std = DRY_STD[mat] ?? DRY_STD.other;
   if (mc <= std.dry) return 'rgba(34,197,94,0.75)';
   if (mc >= std.wet) return 'rgba(239,68,68,0.80)';
@@ -35,31 +35,30 @@ function cellColor(mc: number | null, mat: string): string {
 const TRAMEX_SERVICE = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 const TRAMEX_CHAR_RX = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
 
+const inputCls = 'w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-sm text-white outline-none focus:ring-1 focus:ring-cyan-500 placeholder-slate-500';
+
 export default function JobMoistureTab({ jobId, userId }: { jobId: string; userId: string }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef   = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [sessions, setSessions] = useState<MapSession[]>([]);
+  const [sessions, setSessions]         = useState<MapSession[]>([]);
   const [activeSession, setActiveSession] = useState<MapSession | null>(null);
-  const [cells, setCells] = useState<GridCell[]>([]);
-  const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null);
+  const [cells, setCells]               = useState<GridCell[]>([]);
+  const [bgImage, setBgImage]           = useState<HTMLImageElement | null>(null);
   const [selectedCell, setSelectedCell] = useState<{ col: number; row: number } | null>(null);
-  const [showPanel, setShowPanel] = useState(false);
+  const [showPanel, setShowPanel]       = useState(false);
   const [showNewSession, setShowNewSession] = useState(false);
 
-  // BLE
-  const [bleDevice, setBleDevice] = useState<BluetoothDevice | null>(null);
-  const [bleStatus, setBleStatus] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
+  const [bleDevice, setBleDevice]   = useState<BluetoothDevice | null>(null);
+  const [bleStatus, setBleStatus]   = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
   const [bleReading, setBleReading] = useState<number | null>(null);
 
-  // Form
-  const [form, setForm] = useState({ mc_percent: '', material_type: 'drywall', label: '', rh_percent: '', temp_f: '' });
-  const [newSession, setNewSession] = useState({ name: 'Main Floor', surface_type: 'floor', visit_day: '1', grid_cols: '10', grid_rows: '8' });
-
-  const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [success, setSuccess] = useState('');
-  const [error, setError] = useState('');
+  const [form, setForm]               = useState({ mc_percent: '', material_type: 'drywall', label: '', rh_percent: '', temp_f: '' });
+  const [newSession, setNewSession]   = useState({ name: 'Main Floor', surface_type: 'floor', visit_day: '1', grid_cols: '10', grid_rows: '8' });
+  const [saving, setSaving]           = useState(false);
+  const [loading, setLoading]         = useState(true);
+  const [success, setSuccess]         = useState('');
+  const [error, setError]             = useState('');
 
   useEffect(() => { loadSessions(); }, [jobId]);
 
@@ -81,7 +80,6 @@ export default function JobMoistureTab({ jobId, userId }: { jobId: string; userI
     } else setBgImage(null);
   }, [activeSession]);
 
-  // Draw canvas
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !activeSession) return;
@@ -91,8 +89,8 @@ export default function JobMoistureTab({ jobId, userId }: { jobId: string; userI
     const cols = activeSession.grid_cols, rows = activeSession.grid_rows;
     const cw = W / cols, ch = H / rows;
     ctx.clearRect(0, 0, W, H);
-    if (bgImage) { ctx.globalAlpha = 0.35; ctx.drawImage(bgImage, 0, 0, W, H); ctx.globalAlpha = 1; }
-    else { ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 0, W, H); }
+    ctx.fillStyle = '#0f172a'; ctx.fillRect(0, 0, W, H);
+    if (bgImage) { ctx.globalAlpha = 0.25; ctx.drawImage(bgImage, 0, 0, W, H); ctx.globalAlpha = 1; }
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const cell = cells.find(ce => ce.col_index === c && ce.row_index === r);
@@ -100,16 +98,16 @@ export default function JobMoistureTab({ jobId, userId }: { jobId: string; userI
         ctx.fillStyle = cellColor(cell?.mc_percent ?? null, cell?.material_type ?? 'drywall');
         ctx.fillRect(x + 1, y + 1, cw - 2, ch - 2);
         if (cell?.mc_percent != null) {
-          ctx.fillStyle = '#1f2937';
+          ctx.fillStyle = '#ffffff';
           ctx.font = `bold ${Math.max(9, Math.min(13, cw * 0.28))}px sans-serif`;
           ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
           ctx.fillText(`${cell.mc_percent}%`, x + cw / 2, y + ch / 2);
         }
         if (selectedCell?.col === c && selectedCell?.row === r) {
-          ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 3;
+          ctx.strokeStyle = '#06b6d4'; ctx.lineWidth = 3;
           ctx.strokeRect(x + 1, y + 1, cw - 2, ch - 2);
         }
-        ctx.strokeStyle = 'rgba(100,116,139,0.3)'; ctx.lineWidth = 0.5;
+        ctx.strokeStyle = 'rgba(100,116,139,0.2)'; ctx.lineWidth = 0.5;
         ctx.strokeRect(x, y, cw, ch);
       }
     }
@@ -208,13 +206,13 @@ export default function JobMoistureTab({ jobId, userId }: { jobId: string; userI
     setSuccess('📷 Background set!'); setTimeout(() => setSuccess(''), 2000);
   };
 
-  const filledCells = cells.filter(c => c.mc_percent !== null);
-  const dryCells = filledCells.filter(c => c.mc_percent! <= (DRY_STD[c.material_type]?.dry ?? 15));
-  const wetCells = filledCells.filter(c => c.mc_percent! >= (DRY_STD[c.material_type]?.wet ?? 20));
-  const dryPct = filledCells.length > 0 ? Math.round((dryCells.length / filledCells.length) * 100) : 0;
+  const filledCells  = cells.filter(c => c.mc_percent !== null);
+  const dryCells     = filledCells.filter(c => c.mc_percent! <= (DRY_STD[c.material_type]?.dry ?? 15));
+  const wetCells     = filledCells.filter(c => c.mc_percent! >= (DRY_STD[c.material_type]?.wet ?? 20));
+  const dryPct       = filledCells.length > 0 ? Math.round((dryCells.length / filledCells.length) * 100) : 0;
   const existingSelected = selectedCell ? cells.find(c => c.col_index === selectedCell.col && c.row_index === selectedCell.row) : null;
 
-  if (loading) return <div className="flex items-center justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-blue-500" /></div>;
+  if (loading) return <div className="flex items-center justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-cyan-500" /></div>;
 
   return (
     <div className="space-y-4">
@@ -223,28 +221,34 @@ export default function JobMoistureTab({ jobId, userId }: { jobId: string; userI
         <div className="flex items-center gap-2 flex-wrap">
           {sessions.map(s => (
             <button key={s.id} onClick={() => { setActiveSession(s); setSelectedCell(null); setShowPanel(false); }}
-              className={`text-xs px-3 py-1.5 rounded-full border font-medium transition ${activeSession?.id === s.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400'}`}>
+              className={`text-xs px-3 py-1.5 rounded-full border font-medium transition ${
+                activeSession?.id === s.id
+                  ? 'bg-cyan-500 text-slate-900 border-cyan-500'
+                  : 'bg-slate-700/50 text-slate-400 border-slate-600/40 hover:border-cyan-500/50 hover:text-cyan-400'
+              }`}>
               {s.name} · Day {s.visit_day}
             </button>
           ))}
           <button onClick={() => setShowNewSession(!showNewSession)}
-            className="text-xs px-3 py-1.5 rounded-full border border-dashed border-blue-400 text-blue-600 hover:bg-blue-50 font-medium transition flex items-center gap-1">
+            className="text-xs px-3 py-1.5 rounded-full border border-dashed border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/10 font-medium transition flex items-center gap-1">
             <Plus className="w-3 h-3" /> New Surface
           </button>
         </div>
         {/* BLE button */}
         {bleStatus === 'connected' ? (
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 bg-green-50 border border-green-200 text-green-700 text-xs font-semibold px-3 py-2 rounded-lg">
+            <div className="flex items-center gap-1.5 bg-emerald-900/30 border border-emerald-700/40 text-emerald-300 text-xs font-semibold px-3 py-2 rounded-xl">
               <BluetoothConnected className="w-4 h-4 animate-pulse" /> ME5 Live
-              {bleReading !== null && <span className="ml-1 bg-green-200 text-green-900 px-2 py-0.5 rounded-full font-bold">{bleReading}%</span>}
+              {bleReading !== null && <span className="ml-1 bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">{bleReading}%</span>}
             </div>
             <button onClick={() => { bleDevice?.gatt?.disconnect(); setBleStatus('idle'); setBleDevice(null); setBleReading(null); }}
-              className="p-2 bg-gray-100 hover:bg-red-50 hover:text-red-600 rounded-lg"><BluetoothOff className="w-4 h-4" /></button>
+              className="p-2 bg-slate-700/50 hover:bg-red-900/30 hover:text-red-400 text-slate-400 rounded-xl transition">
+              <BluetoothOff className="w-4 h-4" />
+            </button>
           </div>
         ) : (
           <button onClick={connectBLE} disabled={bleStatus === 'connecting'}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white text-xs font-semibold px-3 py-2 rounded-lg transition">
+            className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-600 text-slate-900 disabled:text-slate-400 text-xs font-bold px-3 py-2 rounded-xl transition shadow-lg shadow-cyan-500/20">
             {bleStatus === 'connecting' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bluetooth className="w-3.5 h-3.5" />}
             Connect Tramex ME5
           </button>
@@ -252,31 +256,40 @@ export default function JobMoistureTab({ jobId, userId }: { jobId: string; userI
       </div>
 
       {/* Alerts */}
-      {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-3 flex items-center justify-between">{error}<button onClick={() => setError('')}><X className="w-4 h-4" /></button></div>}
-      {success && <div className="bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg p-3">{success}</div>}
+      {error && (
+        <div className="bg-red-900/30 border border-red-700/40 text-red-300 text-sm rounded-xl p-3 flex items-center justify-between">
+          {error}<button onClick={() => setError('')}><X className="w-4 h-4" /></button>
+        </div>
+      )}
+      {success && <div className="bg-emerald-900/30 border border-emerald-700/40 text-emerald-300 text-sm rounded-xl p-3">{success}</div>}
 
       {/* New session form */}
       {showNewSession && (
-        <div className="bg-white border border-blue-200 rounded-xl p-4">
+        <div className="bg-slate-800/80 border border-slate-600/40 rounded-2xl p-4">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold flex items-center gap-2"><Grid3X3 className="w-4 h-4 text-blue-600" /> New Map Surface</h3>
-            <button onClick={() => setShowNewSession(false)}><X className="w-4 h-4 text-gray-400" /></button>
+            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+              <Grid3X3 className="w-4 h-4 text-cyan-400" /> New Map Surface
+            </h3>
+            <button onClick={() => setShowNewSession(false)} className="text-slate-400 hover:text-white"><X className="w-4 h-4" /></button>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            <div className="col-span-2"><label className="block text-xs font-medium text-gray-600 mb-1">Name</label>
-              <input type="text" value={newSession.name} onChange={e => setNewSession(p => ({ ...p, name: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none" /></div>
-            <div><label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
-              <select value={newSession.surface_type} onChange={e => setNewSession(p => ({ ...p, surface_type: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none">
+            <div className="col-span-2">
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Name</label>
+              <input type="text" value={newSession.name} onChange={e => setNewSession(p => ({ ...p, name: e.target.value }))} className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Type</label>
+              <select value={newSession.surface_type} onChange={e => setNewSession(p => ({ ...p, surface_type: e.target.value }))} className={inputCls}>
                 <option value="floor">Floor</option><option value="wall">Wall</option><option value="ceiling">Ceiling</option>
-              </select></div>
-            <div><label className="block text-xs font-medium text-gray-600 mb-1">Day</label>
-              <input type="number" min="1" value={newSession.visit_day} onChange={e => setNewSession(p => ({ ...p, visit_day: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none" /></div>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Day</label>
+              <input type="number" min="1" value={newSession.visit_day} onChange={e => setNewSession(p => ({ ...p, visit_day: e.target.value }))} className={inputCls} />
+            </div>
             <div className="flex items-end">
               <button onClick={createSession} disabled={saving || !newSession.name}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white text-sm font-semibold py-2 rounded-lg transition flex items-center justify-center gap-1">
+                className="w-full bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-600 text-slate-900 disabled:text-slate-400 text-sm font-bold py-2 rounded-xl transition flex items-center justify-center gap-1">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Create
               </button>
             </div>
@@ -286,10 +299,10 @@ export default function JobMoistureTab({ jobId, userId }: { jobId: string; userI
 
       {/* No session */}
       {!activeSession && (
-        <div className="text-center py-16 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-          <Droplets className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 font-medium">No moisture maps yet</p>
-          <p className="text-sm text-gray-400 mt-1">Click "+ New Surface" to start a moisture map for this job</p>
+        <div className="text-center py-16 bg-slate-800/40 rounded-2xl border border-dashed border-slate-600/40">
+          <Droplets className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+          <p className="text-slate-400 font-medium">No moisture maps yet</p>
+          <p className="text-sm text-slate-500 mt-1">Click &quot;+ New Surface&quot; to start a moisture map</p>
         </div>
       )}
 
@@ -297,48 +310,53 @@ export default function JobMoistureTab({ jobId, userId }: { jobId: string; userI
       {activeSession && (
         <div className="flex flex-col lg:flex-row gap-4">
           {/* Canvas area */}
-          <div className="flex-1 bg-white rounded-xl border border-gray-200 p-3">
+          <div className="flex-1 bg-slate-800/60 rounded-2xl border border-slate-700/50 p-4">
             {/* Stats */}
             <div className="grid grid-cols-4 gap-2 mb-3">
               {[
-                { label: 'Readings', val: filledCells.length },
-                { label: '✅ Dry', val: dryCells.length },
-                { label: '⚠️ Drying', val: filledCells.length - dryCells.length - wetCells.length },
-                { label: '🔴 Wet', val: wetCells.length },
+                { label: 'Readings', val: filledCells.length,  color: 'text-white'         },
+                { label: '✅ Dry',    val: dryCells.length,      color: 'text-emerald-400'   },
+                { label: '⚠️ Drying', val: filledCells.length - dryCells.length - wetCells.length, color: 'text-amber-400' },
+                { label: '🔴 Wet',   val: wetCells.length,      color: 'text-red-400'       },
               ].map(s => (
-                <div key={s.label} className="bg-gray-50 rounded-lg p-2 text-center">
-                  <div className="text-lg font-bold text-gray-900">{s.val}</div>
-                  <div className="text-[10px] text-gray-500">{s.label}</div>
+                <div key={s.label} className="bg-slate-700/50 rounded-xl p-2 text-center">
+                  <div className={`text-lg font-bold ${s.color}`}>{s.val}</div>
+                  <div className="text-[10px] text-slate-500">{s.label}</div>
                 </div>
               ))}
             </div>
             {/* Drying progress */}
             {filledCells.length > 0 && (
               <div className="mb-3">
-                <div className="flex justify-between text-xs text-gray-500 mb-1">
-                  <span>Drying Progress</span><span className="font-bold text-green-600">{dryPct}% DRY</span>
+                <div className="flex justify-between text-xs text-slate-400 mb-1.5">
+                  <span>Drying Progress</span>
+                  <span className="font-bold text-emerald-400">{dryPct}% DRY</span>
                 </div>
-                <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                  <div className="h-2 rounded-full bg-gradient-to-r from-red-400 via-yellow-400 to-green-500" style={{ width: `${dryPct}%` }} />
+                <div className="w-full bg-slate-700 rounded-full h-2 overflow-hidden">
+                  <div className="h-2 rounded-full bg-gradient-to-r from-red-500 via-amber-400 to-emerald-400 transition-all" style={{ width: `${dryPct}%` }} />
                 </div>
               </div>
             )}
             {/* Legend */}
             <div className="flex gap-3 mb-2 text-[10px]">
-              {[{ c: 'bg-green-400', l: '✅ Dry' }, { c: 'bg-yellow-400', l: '⚠️ Drying' }, { c: 'bg-red-400', l: '🔴 Wet' }, { c: 'bg-gray-200', l: 'Empty' }].map(l => (
-                <div key={l.l} className="flex items-center gap-1"><span className={`w-3 h-3 rounded-sm ${l.c}`}></span><span className="text-gray-500">{l.l}</span></div>
+              {[{ c: 'bg-emerald-400', l: '✅ Dry' }, { c: 'bg-amber-400', l: '⚠️ Drying' }, { c: 'bg-red-400', l: '🔴 Wet' }, { c: 'bg-slate-600', l: 'Empty' }].map(l => (
+                <div key={l.l} className="flex items-center gap-1">
+                  <span className={`w-3 h-3 rounded-sm ${l.c}`} />
+                  <span className="text-slate-500">{l.l}</span>
+                </div>
               ))}
             </div>
-            <p className="text-[10px] text-gray-400 mb-2 flex items-center gap-1"><Info className="w-3 h-3" /> Tap any cell to log a reading</p>
+            <p className="text-[10px] text-slate-500 mb-2 flex items-center gap-1">
+              <Info className="w-3 h-3" /> Tap any cell to log a reading
+            </p>
             <canvas ref={canvasRef} width={600} height={420} onClick={handleCanvasClick}
-              className="w-full rounded-lg cursor-crosshair border border-gray-100" style={{ touchAction: 'none' }} />
-            {/* Background photo button */}
+              className="w-full rounded-xl cursor-crosshair border border-slate-700/30" style={{ touchAction: 'none' }} />
             <div className="mt-2 flex items-center justify-between">
-              <p className="text-[10px] text-gray-400">
+              <p className="text-[10px] text-slate-500">
                 {activeSession.background_url ? '📷 Floor plan loaded' : '💡 Set floor plan photo as background (Insta360 X4)'}
               </p>
               <button onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-1 text-[10px] text-blue-600 hover:underline">
+                className="flex items-center gap-1 text-[10px] text-cyan-400 hover:text-cyan-300 transition">
                 <Camera className="w-3 h-3" /> {activeSession.background_url ? 'Change' : 'Set Photo'}
               </button>
             </div>
@@ -347,48 +365,60 @@ export default function JobMoistureTab({ jobId, userId }: { jobId: string; userI
 
           {/* Cell panel */}
           {showPanel && selectedCell && (
-            <div className="w-full lg:w-64 bg-white rounded-xl border border-blue-300 shadow-lg p-4">
+            <div className="w-full lg:w-64 bg-slate-800/80 rounded-2xl border border-cyan-500/30 shadow-xl shadow-cyan-500/5 p-4">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-gray-800">Cell [{selectedCell.col + 1}, {selectedCell.row + 1}]
-                  {existingSelected && <span className="ml-2 text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">Update</span>}
+                <h3 className="text-sm font-bold text-white">
+                  Cell [{selectedCell.col + 1}, {selectedCell.row + 1}]
+                  {existingSelected && <span className="ml-2 text-[10px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded-full">Update</span>}
                 </h3>
-                <button onClick={() => { setShowPanel(false); setSelectedCell(null); }}><X className="w-4 h-4 text-gray-400" /></button>
+                <button onClick={() => { setShowPanel(false); setSelectedCell(null); }} className="text-slate-400 hover:text-white">
+                  <X className="w-4 h-4" />
+                </button>
               </div>
               {bleStatus === 'connected' && bleReading !== null && (
-                <div className="flex items-center justify-between mb-3 p-2 bg-green-50 border border-green-200 rounded-lg">
-                  <span className="text-xs text-gray-600 flex items-center gap-1"><BluetoothConnected className="w-3 h-3 text-blue-500" />ME5 Live</span>
-                  <span className="text-sm font-bold text-green-700">{bleReading}%</span>
+                <div className="flex items-center justify-between mb-3 p-2 bg-emerald-900/30 border border-emerald-700/40 rounded-xl">
+                  <span className="text-xs text-slate-400 flex items-center gap-1">
+                    <BluetoothConnected className="w-3 h-3 text-cyan-400" /> ME5 Live
+                  </span>
+                  <span className="text-sm font-bold text-emerald-300">{bleReading}%</span>
                 </div>
               )}
               <div className="space-y-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">MC% *
-                    {bleStatus === 'connected' && <button onClick={() => bleReading !== null && setForm(f => ({ ...f, mc_percent: bleReading.toString() }))} className="ml-2 text-[10px] text-blue-600 hover:underline">Use live</button>}
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                    MC% *
+                    {bleStatus === 'connected' && (
+                      <button onClick={() => bleReading !== null && setForm(f => ({ ...f, mc_percent: bleReading.toString() }))}
+                        className="ml-2 text-cyan-400 hover:text-cyan-300 font-medium text-[10px] normal-case">Use live</button>
+                    )}
                   </label>
-                  <input type="number" step="0.1" value={form.mc_percent} onChange={e => setForm(p => ({ ...p, mc_percent: e.target.value }))}
-                    placeholder="e.g. 18.5" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none" />
+                  <input type="number" step="0.1" value={form.mc_percent}
+                    onChange={e => setForm(p => ({ ...p, mc_percent: e.target.value }))}
+                    placeholder="e.g. 18.5" className={inputCls} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Material</label>
-                  <select value={form.material_type} onChange={e => setForm(p => ({ ...p, material_type: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none">
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Material</label>
+                  <select value={form.material_type} onChange={e => setForm(p => ({ ...p, material_type: e.target.value }))} className={inputCls}>
                     {Object.keys(DRY_STD).map(m => <option key={m} value={m}>{m.charAt(0).toUpperCase() + m.slice(1)}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Location note</label>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Location note</label>
                   <input type="text" value={form.label} onChange={e => setForm(p => ({ ...p, label: e.target.value }))}
-                    placeholder="e.g. NW corner" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none" />
+                    placeholder="e.g. NW corner" className={inputCls} />
                 </div>
                 <div className="flex gap-2">
                   <button onClick={saveReading} disabled={saving}
-                    className="flex-1 flex items-center justify-center gap-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white text-sm font-semibold py-2.5 rounded-lg transition">
+                    className="flex-1 flex items-center justify-center gap-1 bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-600 text-slate-900 disabled:text-slate-400 text-sm font-bold py-2.5 rounded-xl transition">
                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
                     {existingSelected ? 'Update' : 'Save'}
                   </button>
                   {existingSelected && (
-                    <button onClick={async () => { await supabase.from('moisture_grid_cells').delete().eq('id', existingSelected.id); setCells(p => p.filter(c => c.id !== existingSelected.id)); setShowPanel(false); setSelectedCell(null); }}
-                      className="p-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg border border-red-200">
+                    <button onClick={async () => {
+                      await supabase.from('moisture_grid_cells').delete().eq('id', existingSelected.id);
+                      setCells(p => p.filter(c => c.id !== existingSelected.id));
+                      setShowPanel(false); setSelectedCell(null);
+                    }} className="p-2.5 bg-red-900/30 hover:bg-red-900/50 text-red-400 rounded-xl border border-red-700/40 transition">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   )}

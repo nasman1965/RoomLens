@@ -209,7 +209,7 @@ export default function EmployeesPage() {
             </div>
             {canManage && (
               <button onClick={openAdd}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition">
+                className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition">
                 <Plus className="w-4 h-4" /> Add Employee
               </button>
             )}
@@ -313,7 +313,7 @@ export default function EmployeesPage() {
 
                 <div className="flex gap-2 pt-1">
                   <button type="submit" disabled={saving}
-                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold py-2 px-5 rounded-lg text-sm transition">
+                    className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-60 text-white font-semibold py-2 px-5 rounded-lg text-sm transition">
                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                     {editId ? 'Update Member' : 'Create & Send Invite'}
                   </button>
@@ -420,7 +420,7 @@ export default function EmployeesPage() {
               </p>
               {!search && filter === 'all' && canManage && (
                 <button onClick={openAdd}
-                  className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition">
+                  className="inline-flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition">
                   <Plus className="w-4 h-4" /> Add Employee
                 </button>
               )}

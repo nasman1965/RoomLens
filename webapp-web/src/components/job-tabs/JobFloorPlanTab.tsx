@@ -579,14 +579,14 @@ export default function JobFloorPlanTab({
             {lightboxPlan.rooms && lightboxPlan.rooms.length > 0 ? (
               <div className="grid grid-cols-2 gap-2">
                 {lightboxPlan.rooms.map((r, i) => (
-                  <div key={i} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                    <p className="text-sm font-medium text-gray-800">{r.name}</p>
-                    {r.type && <p className="text-xs text-gray-500 capitalize">{r.type}</p>}
-                    {r.area && <p className="text-xs text-blue-600 font-medium">{r.area} ft²</p>}
+                  <div key={i} className="bg-slate-700/50 rounded-xl p-3 border border-slate-600/40">
+                    <p className="text-sm font-medium text-white">{r.name}</p>
+                    {r.type && <p className="text-xs text-slate-500 capitalize">{r.type}</p>}
+                    {r.area && <p className="text-xs text-cyan-400 font-medium">{r.area} ft²</p>}
                   </div>
                 ))}
               </div>
-            ) : <p className="text-sm text-gray-500">No room data.</p>}
+            ) : <p className="text-sm text-slate-500">No room data.</p>}
           </div>
         </div>
       )}
