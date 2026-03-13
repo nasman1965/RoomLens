@@ -127,21 +127,20 @@ export default function EmployeesPage() {
         if (error) { setFormErr(error.message); return; }
         setFormOk('Member updated.'); setShowForm(false); load(userId);
       } else {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { temp_password: _tp, ...rest } = form;
-        const { data: nm, error: ie } = await supabase
-          .from('team_members')
-          .insert({ ...rest, user_id: userId, is_active: true })
-          .select('id').single();
-        if (ie || !nm) { setFormErr(ie?.message || 'Insert failed.'); return; }
-
+        // Send everything to the API route — it handles users upsert +
+        // team_members insert + auth user creation with service role key
+        // (avoids FK violation from client-side insert)
         const res = await fetch('/api/staff/invite', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            member_id: nm.id, email: form.email,
-            full_name: form.full_name, temp_password: form.temp_password,
-            company_name: company, admin_user_id: userId,
+            email: form.email,
+            full_name: form.full_name,
+            role: form.role,
             cell_phone: form.cell_phone || null,
+            notes: form.notes || null,
+            temp_password: form.temp_password,
+            company_name: company,
+            admin_user_id: userId,
           }),
         });
         const r = await res.json();
