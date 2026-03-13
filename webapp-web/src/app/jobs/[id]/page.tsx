@@ -1603,7 +1603,17 @@ export default function JobDetailPage() {
       {/* ── Floor Plans Tab ── */}
       {activeJobTab === 'floorplans' && (
         <div className="py-2">
-          <JobFloorPlanTab jobId={job.id} userId={userId} />
+          <JobFloorPlanTab
+            jobId={job.id}
+            userId={userId}
+            jobData={{
+              insured_name:     job.insured_name,
+              property_address: job.property_address,
+              claim_number:     job.claim_number,
+              insurer_name:     job.insurer_name,
+              job_type:         job.job_type,
+            }}
+          />
         </div>
       )}
 
