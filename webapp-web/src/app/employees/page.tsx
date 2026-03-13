@@ -192,9 +192,9 @@ export default function EmployeesPage() {
   }
 
   return (
-    <div className="flex h-screen bg-slate-950">
+    <div className="flex bg-slate-950 min-h-screen">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto pt-14 lg:pt-0 pb-20 lg:pb-0">
 
         {/* Header */}
         <div className="bg-slate-900 border-b border-slate-700 px-6 py-5">

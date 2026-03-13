@@ -49,3 +49,15 @@ input:-webkit-autofill:focus {
 .badge {
   @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
 }
+
+/* iPhone safe area for bottom nav */
+.pb-safe {
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+/* Prevent content jumping on mobile when sidebar opens */
+@media (max-width: 1024px) {
+  html {
+    scroll-behavior: smooth;
+  }
+}

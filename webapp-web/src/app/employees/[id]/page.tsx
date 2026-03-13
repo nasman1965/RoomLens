@@ -213,7 +213,7 @@ export default function EmployeeProfilePage() {
   };
 
   if (loading) return (
-    <div className="flex h-screen bg-slate-950">
+    <div className="flex bg-slate-950 min-h-screen">
       <Sidebar />
       <div className="flex-1 flex items-center justify-center">
         <div className="text-slate-400 text-sm animate-pulse">Loading profile...</div>
@@ -251,9 +251,9 @@ export default function EmployeeProfilePage() {
   ] as const;
 
   return (
-    <div className="flex h-screen bg-slate-950">
+    <div className="flex bg-slate-950 min-h-screen">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto pt-14 lg:pt-0 pb-20 lg:pb-0">
 
         {/* Top bar */}
         <div className="bg-slate-900 border-b border-slate-700 px-6 py-4">
