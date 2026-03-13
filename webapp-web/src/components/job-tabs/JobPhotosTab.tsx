@@ -160,7 +160,7 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
       {showTagForm && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 grid grid-cols-3 gap-3">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Room</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Rooms</label>
             <select value={tagForm.room_tag} onChange={e => setTagForm(p => ({ ...p, room_tag: e.target.value }))}
               className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm outline-none">
               <option value="">No room tag</option>
