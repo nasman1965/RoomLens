@@ -1,5 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Photos service — Supabase Storage + damage_photos table
+// Photos service — Supabase Storage (job-photos bucket) + job_photos table
+// Same bucket & table as the web dashboard
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { supabase } from './supabase';
@@ -10,16 +11,21 @@ export interface Photo {
   photo_url: string;
   room_tag: string | null;
   damage_tag: string | null;
+  area: string | null;
   timestamp: string;
   signedUrl?: string;
 }
 
+const BUCKET = 'job-photos';
+const TABLE  = 'job_photos';
+
 export const photosService = {
+
   /** Get all photos for a job with signed URLs */
   async getPhotos(jobId: string): Promise<{ photos: Photo[]; error: string | null }> {
     try {
       const { data, error } = await supabase
-        .from('damage_photos')
+        .from(TABLE)
         .select('*')
         .eq('job_id', jobId)
         .order('timestamp', { ascending: false });
@@ -27,12 +33,15 @@ export const photosService = {
       if (error) return { photos: [], error: error.message };
 
       const photos = await Promise.all((data ?? []).map(async (p) => {
-        const path = extractPath(p.photo_url);
-        if (!path) return { ...p, signedUrl: p.photo_url };
-        const { data: s } = await supabase.storage
-          .from('damage-photos')
-          .createSignedUrl(path, 3600);
-        return { ...p, signedUrl: s?.signedUrl ?? p.photo_url };
+        if (p.photo_url?.startsWith('http')) return { ...p, signedUrl: p.photo_url };
+        try {
+          const { data: s } = await supabase.storage
+            .from(BUCKET)
+            .createSignedUrl(p.photo_url, 3600);
+          return { ...p, signedUrl: s?.signedUrl ?? p.photo_url };
+        } catch {
+          return { ...p, signedUrl: p.photo_url };
+        }
       }));
 
       return { photos, error: null };
@@ -41,49 +50,49 @@ export const photosService = {
     }
   },
 
-  /** Upload a photo from URI to Supabase storage */
+  /** Upload a photo from a local URI to Supabase storage */
   async uploadPhoto(
     jobId: string,
     userId: string,
     uri: string,
     roomTag?: string,
     damageTag?: string,
+    area?: string,
   ): Promise<{ photo: Photo | null; error: string | null }> {
     try {
-      // Convert URI to blob
       const response = await fetch(uri);
       const blob = await response.blob();
-      const ext = uri.split('.').pop()?.toLowerCase() ?? 'jpg';
-      const path = `${userId}/${jobId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
-      // Upload to storage
+      const uriLower = uri.toLowerCase();
+      let ext = 'jpg';
+      if (uriLower.includes('.png'))  ext = 'png';
+      if (uriLower.includes('.webp')) ext = 'webp';
+      if (uriLower.includes('.heic')) ext = 'heic';
+      if (uriLower.includes('.heif')) ext = 'heif';
+
+      const path = `${userId}/${jobId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const contentType = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`;
+
       const { error: storageErr } = await supabase.storage
-        .from('damage-photos')
-        .upload(path, blob, { contentType: `image/${ext}`, upsert: false });
+        .from(BUCKET)
+        .upload(path, blob, { contentType, upsert: false });
 
       if (storageErr) return { photo: null, error: storageErr.message };
 
-      // Get public URL (stored in DB)
-      const { data: { publicUrl } } = supabase.storage
-        .from('damage-photos')
-        .getPublicUrl(path);
+      const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(path);
+      const { data: signed } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600);
 
-      // Get signed URL (for display)
-      const { data: signed } = await supabase.storage
-        .from('damage-photos')
-        .createSignedUrl(path, 3600);
-
-      // Insert record
       const payload: Record<string, any> = {
-        job_id: jobId,
-        photo_url: publicUrl,
+        job_id:        jobId,
+        photo_url:     publicUrl,
         technician_id: userId,
       };
       if (roomTag)   payload.room_tag   = roomTag;
       if (damageTag) payload.damage_tag = damageTag;
+      if (area)      payload.area       = area;
 
       const { data: rec, error: dbErr } = await supabase
-        .from('damage_photos')
+        .from(TABLE)
         .insert(payload)
         .select()
         .single();
@@ -99,12 +108,12 @@ export const photosService = {
     }
   },
 
-  /** Delete a photo */
+  /** Delete a photo from storage and database */
   async deletePhoto(photo: Photo): Promise<{ error: string | null }> {
     try {
       const path = extractPath(photo.photo_url);
-      if (path) await supabase.storage.from('damage-photos').remove([path]);
-      await supabase.from('damage_photos').delete().eq('id', photo.id);
+      if (path) await supabase.storage.from(BUCKET).remove([path]);
+      await supabase.from(TABLE).delete().eq('id', photo.id);
       return { error: null };
     } catch (err: any) {
       return { error: err?.message ?? 'Delete failed' };
@@ -112,13 +121,11 @@ export const photosService = {
   },
 };
 
-// ── helpers ───────────────────────────────────────────────────────────────────
-
 function extractPath(url: string): string | null {
   try {
     const patterns = [
-      /\/object\/(?:public|authenticated|sign)\/damage-photos\/(.+?)(?:\?|$)/,
-      /\/damage-photos\/(.+?)(?:\?|$)/,
+      /\/object\/(?:public|authenticated|sign)\/job-photos\/(.+?)(?:\?|$)/,
+      /\/job-photos\/(.+?)(?:\?|$)/,
     ];
     for (const re of patterns) {
       const m = url.match(re);

@@ -136,4 +136,20 @@ export const jobsService = {
       status: 'active' as any,
     });
   },
+
+  /** Update only the status field */
+  async updateJobStatus(id: string, status: Job['status']): Promise<{ error: string | null }> {
+    return jobsService.updateJob(id, { status });
+  },
+
+  /** Permanently delete a job */
+  async deleteJob(id: string): Promise<{ error: string | null }> {
+    try {
+      const { error } = await supabase.from('jobs').delete().eq('id', id);
+      if (error) return { error: error.message };
+      return { error: null };
+    } catch (err: any) {
+      return { error: err?.message ?? 'Failed to delete job' };
+    }
+  },
 };
