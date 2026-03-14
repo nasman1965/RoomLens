@@ -197,38 +197,38 @@ export default function EmployeesPage() {
       <main className="flex-1 overflow-y-auto pt-14 lg:pt-0 pb-20 lg:pb-0">
 
         {/* Header */}
-        <div className="bg-slate-900 border-b border-slate-700 px-6 py-5">
-          <div className="flex items-center justify-between">
-            <div>
+        <div className="bg-slate-900 border-b border-slate-700 px-4 sm:px-6 py-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
               <p className="text-blue-400 text-xs font-semibold uppercase tracking-widest mb-0.5">Team Management</p>
-              <h1 className="text-white font-bold text-2xl flex items-center gap-2">
-                <Users className="w-6 h-6 text-blue-400" /> Employees
+              <h1 className="text-white font-bold text-xl flex items-center gap-2">
+                <Users className="w-5 h-5 text-blue-400 shrink-0" /> Employees
               </h1>
-              <p className="text-slate-400 text-sm mt-0.5">{members.length} team member{members.length !== 1 ? 's' : ''}</p>
+              <p className="text-slate-400 text-xs mt-0.5">{members.length} team member{members.length !== 1 ? 's' : ''}</p>
             </div>
             {canManage && (
               <button onClick={openAdd}
-                className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition">
-                <Plus className="w-4 h-4" /> Add Employee
+                className="flex items-center gap-1.5 bg-cyan-500 hover:bg-cyan-400 text-white text-xs font-semibold px-3 py-2 rounded-lg transition shrink-0">
+                <Plus className="w-3.5 h-3.5" /> Add Employee
               </button>
             )}
           </div>
         </div>
 
-        <div className="p-6 space-y-5">
+        <div className="p-4 sm:p-6 space-y-4">
 
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-4">
+          {/* Stats — 3 cols but compact on mobile */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-4">
             {[
-              { label: 'Active Staff',   value: nActive,  color: 'text-green-400',  bg: 'bg-green-900/20 border-green-700/30',  Icon: UserCheck },
-              { label: 'Invite Pending', value: nInvited, color: 'text-yellow-400', bg: 'bg-yellow-900/20 border-yellow-700/30', Icon: Clock },
-              { label: 'Not Invited',    value: nPending, color: 'text-slate-400',  bg: 'bg-slate-800/60 border-slate-700',      Icon: User },
+              { label: 'Active',   value: nActive,  color: 'text-green-400',  bg: 'bg-green-900/20 border-green-700/30',  Icon: UserCheck },
+              { label: 'Invited',  value: nInvited, color: 'text-yellow-400', bg: 'bg-yellow-900/20 border-yellow-700/30', Icon: Clock },
+              { label: 'Pending',  value: nPending, color: 'text-slate-400',  bg: 'bg-slate-800/60 border-slate-700',      Icon: User },
             ].map(s => (
-              <div key={s.label} className={`${s.bg} border rounded-xl p-4 flex items-center gap-3`}>
-                <s.Icon className={`w-6 h-6 ${s.color}`} />
+              <div key={s.label} className={`${s.bg} border rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row items-center sm:items-start gap-1 sm:gap-3 text-center sm:text-left`}>
+                <s.Icon className={`w-5 h-5 ${s.color} shrink-0`} />
                 <div>
-                  <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-                  <p className="text-slate-400 text-xs">{s.label}</p>
+                  <p className={`text-xl sm:text-2xl font-bold ${s.color}`}>{s.value}</p>
+                  <p className="text-slate-400 text-[10px] sm:text-xs leading-tight">{s.label}</p>
                 </div>
               </div>
             ))}
