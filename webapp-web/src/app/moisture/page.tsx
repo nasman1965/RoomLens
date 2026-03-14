@@ -8,6 +8,17 @@ import {
   Camera, Grid3X3, Trash2, LayoutGrid, Settings2,
   TrendingDown, TrendingUp, Minus, Info, RefreshCw,
 } from 'lucide-react';
+import {
+  Chart as ChartJS,
+  CategoryScale, LinearScale, PointElement, LineElement,
+  Title, Tooltip, Legend, Filler,
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
+
+ChartJS.register(
+  CategoryScale, LinearScale, PointElement, LineElement,
+  Title, Tooltip, Legend, Filler,
+);
 
 // ─── Types ──────────────────────────────────────────────────
 interface Job { id: string; insured_name: string; property_address: string; }
@@ -37,6 +48,7 @@ interface GridCell {
   device_id: string | null;
   recorded_at: string;
 }
+interface TrendPoint { day: number; avgMC: number; minMC: number; maxMC: number; count: number; surface: string; }
 
 // ─── IICRC S500 Dry Standards ───────────────────────────────
 const DRY_STD: Record<string, { wet: number; dry: number }> = {
@@ -125,7 +137,11 @@ export default function MoisturePage() {
   const [error, setError]       = useState('');
   const [success, setSuccess]   = useState('');
   const [showPanel, setShowPanel] = useState(false);
-  const [activeTab, setActiveTab] = useState<'map' | 'list' | 'stats'>('map');
+  const [activeTab, setActiveTab] = useState<'map' | 'list' | 'stats' | 'trend'>('map');
+
+  // ─── Trend data (all sessions for this job) ────────────
+  const [trendData, setTrendData]   = useState<TrendPoint[]>([]);
+  const [trendLoading, setTrendLoading] = useState(false);
 
   // ─── Init ────────────────────────────────────────────────
   useEffect(() => {
@@ -438,6 +454,51 @@ export default function MoisturePage() {
     setSaving(false);
   };
 
+  // ─── Load trend data ──────────────────────────────────────
+  const loadTrendData = useCallback(async () => {
+    if (!selectedJobId) return;
+    setTrendLoading(true);
+    // Fetch all sessions for job
+    const { data: sessData } = await supabase
+      .from('moisture_map_sessions')
+      .select('id, name, surface_type, visit_day')
+      .eq('job_id', selectedJobId)
+      .order('visit_day');
+    if (!sessData || sessData.length === 0) { setTrendData([]); setTrendLoading(false); return; }
+
+    // Fetch all cells for those sessions
+    const sessionIds = sessData.map(s => s.id);
+    const { data: cellData } = await supabase
+      .from('moisture_grid_cells')
+      .select('session_id, mc_percent, material_type')
+      .in('session_id', sessionIds)
+      .not('mc_percent', 'is', null);
+
+    if (!cellData) { setTrendData([]); setTrendLoading(false); return; }
+
+    // Group: for each session → compute avg/min/max MC%
+    const points: TrendPoint[] = sessData.map(s => {
+      const cells = cellData.filter(c => c.session_id === s.id);
+      if (cells.length === 0) return null;
+      const mcs = cells.map(c => c.mc_percent as number);
+      return {
+        day: s.visit_day,
+        avgMC: parseFloat((mcs.reduce((a, b) => a + b, 0) / mcs.length).toFixed(2)),
+        minMC: parseFloat(Math.min(...mcs).toFixed(2)),
+        maxMC: parseFloat(Math.max(...mcs).toFixed(2)),
+        count: mcs.length,
+        surface: s.name,
+      };
+    }).filter(Boolean) as TrendPoint[];
+
+    setTrendData(points);
+    setTrendLoading(false);
+  }, [selectedJobId]);
+
+  useEffect(() => {
+    if (activeTab === 'trend') loadTrendData();
+  }, [activeTab, loadTrendData]);
+
   // ─── Stats ───────────────────────────────────────────────
   const filledCells = cells.filter(c => c.mc_percent !== null);
   const dryCells    = filledCells.filter(c => {
@@ -698,7 +759,7 @@ export default function MoisturePage() {
 
             {/* Tabs */}
             <div className="flex gap-1 border-b border-gray-200 mb-4">
-              {(['map', 'list', 'stats'] as const).map(tab => (
+              {(['map', 'list', 'stats', 'trend'] as const).map(tab => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -708,7 +769,10 @@ export default function MoisturePage() {
                       : 'border-transparent text-gray-500 hover:text-gray-700'
                   }`}
                 >
-                  {tab === 'map' ? '🗺️ Map' : tab === 'list' ? '📋 Readings List' : '📊 IICRC Standards'}
+                  {tab === 'map' ? '🗺️ Map'
+                    : tab === 'list' ? '📋 Readings'
+                    : tab === 'stats' ? '📊 IICRC'
+                    : '📈 Drying Trend'}
                 </button>
               ))}
             </div>
@@ -951,6 +1015,205 @@ export default function MoisturePage() {
                       })}
                     </tbody>
                   </table>
+                )}
+              </div>
+            )}
+
+            {/* TREND TAB */}
+            {activeTab === 'trend' && (
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="flex items-center justify-between p-4 border-b border-gray-100">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-800">📈 Drying Trend — Day-over-Day</h3>
+                    <p className="text-xs text-gray-400 mt-0.5">Average moisture content % per visit day across all surfaces</p>
+                  </div>
+                  <button
+                    onClick={loadTrendData}
+                    disabled={trendLoading}
+                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600 transition"
+                  >
+                    {trendLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                    Refresh
+                  </button>
+                </div>
+
+                {trendLoading ? (
+                  <div className="flex items-center justify-center p-16">
+                    <Loader2 className="w-7 h-7 animate-spin text-blue-500" />
+                  </div>
+                ) : trendData.length === 0 ? (
+                  <div className="p-12 text-center">
+                    <TrendingDown className="w-10 h-10 mx-auto mb-2 text-gray-200" />
+                    <p className="text-sm text-gray-400">No multi-day data yet.</p>
+                    <p className="text-xs text-gray-300 mt-1">Add at least two visit-day sessions to see a drying trend.</p>
+                  </div>
+                ) : (
+                  <div className="p-4 space-y-6">
+                    {/* Summary row */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {(() => {
+                        const first = trendData[0];
+                        const last  = trendData[trendData.length - 1];
+                        const delta = first && last ? (last.avgMC - first.avgMC).toFixed(1) : '—';
+                        const totalDays = trendData.length;
+                        const trending = last && first ? (last.avgMC < first.avgMC ? '📉 Drying' : '📈 Rising') : '—';
+                        const latestStatus = (() => {
+                          if (!last) return '—';
+                          const mat = 'drywall'; // default reference
+                          const std = DRY_STD[mat];
+                          if (last.avgMC <= std.dry) return '✅ DRY';
+                          if (last.avgMC >= std.wet) return '🔴 WET';
+                          return '⚠️ DRYING';
+                        })();
+                        return [
+                          { label: 'Visit Days', value: totalDays },
+                          { label: 'Starting Avg MC%', value: first ? `${first.avgMC}%` : '—' },
+                          { label: 'Latest Avg MC%', value: last ? `${last.avgMC}%` : '—' },
+                          { label: 'Change', value: delta !== '—' ? `${parseFloat(delta) > 0 ? '+' : ''}${delta}%` : '—' },
+                        ].map(s => (
+                          <div key={s.label} className="bg-gray-50 rounded-xl p-3">
+                            <div className="text-lg font-bold text-gray-900">{s.value}</div>
+                            <div className="text-xs text-gray-500">{s.label}</div>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+
+                    {/* Chart */}
+                    <div className="relative">
+                      <Line
+                        data={{
+                          labels: trendData.map(p => `Day ${p.day}`),
+                          datasets: [
+                            {
+                              label: 'Avg MC%',
+                              data: trendData.map(p => p.avgMC),
+                              borderColor: '#2563eb',
+                              backgroundColor: 'rgba(37,99,235,0.08)',
+                              fill: true,
+                              tension: 0.4,
+                              pointRadius: 5,
+                              pointBackgroundColor: '#2563eb',
+                              borderWidth: 2,
+                            },
+                            {
+                              label: 'Min MC%',
+                              data: trendData.map(p => p.minMC),
+                              borderColor: '#22c55e',
+                              backgroundColor: 'transparent',
+                              borderDash: [4, 4],
+                              tension: 0.3,
+                              pointRadius: 3,
+                              borderWidth: 1.5,
+                            },
+                            {
+                              label: 'Max MC%',
+                              data: trendData.map(p => p.maxMC),
+                              borderColor: '#ef4444',
+                              backgroundColor: 'transparent',
+                              borderDash: [4, 4],
+                              tension: 0.3,
+                              pointRadius: 3,
+                              borderWidth: 1.5,
+                            },
+                            {
+                              label: 'Dry Goal (Drywall ≤12%)',
+                              data: trendData.map(() => DRY_STD.drywall.dry),
+                              borderColor: '#86efac',
+                              backgroundColor: 'rgba(134,239,172,0.05)',
+                              borderDash: [6, 3],
+                              fill: false,
+                              pointRadius: 0,
+                              borderWidth: 2,
+                              tension: 0,
+                            },
+                          ],
+                        }}
+                        options={{
+                          responsive: true,
+                          interaction: { mode: 'index', intersect: false },
+                          plugins: {
+                            legend: { position: 'top', labels: { font: { size: 11 }, usePointStyle: true } },
+                            tooltip: {
+                              callbacks: {
+                                label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}%`,
+                              },
+                            },
+                          },
+                          scales: {
+                            y: {
+                              title: { display: true, text: 'MC%', font: { size: 11 } },
+                              min: 0,
+                              ticks: { callback: (v) => `${v}%` },
+                              grid: { color: 'rgba(0,0,0,0.04)' },
+                            },
+                            x: {
+                              grid: { display: false },
+                            },
+                          },
+                        }}
+                      />
+                    </div>
+
+                    {/* Per-day table */}
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 border-b border-gray-100">
+                        <tr>
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">Visit Day</th>
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">Surface</th>
+                          <th className="px-4 py-2.5 text-center text-xs font-semibold text-gray-600">Readings</th>
+                          <th className="px-4 py-2.5 text-center text-xs font-semibold text-green-600">Min MC%</th>
+                          <th className="px-4 py-2.5 text-center text-xs font-semibold text-blue-600">Avg MC%</th>
+                          <th className="px-4 py-2.5 text-center text-xs font-semibold text-red-600">Max MC%</th>
+                          <th className="px-4 py-2.5 text-center text-xs font-semibold text-gray-600">Trend</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {trendData.map((p, i) => {
+                          const prev = i > 0 ? trendData[i - 1] : null;
+                          const delta = prev ? p.avgMC - prev.avgMC : null;
+                          const std = DRY_STD.drywall;
+                          const isDry = p.avgMC <= std.dry;
+                          const isWet = p.avgMC >= std.wet;
+                          return (
+                            <tr key={p.day} className="hover:bg-gray-50">
+                              <td className="px-4 py-2.5 font-semibold text-gray-800">Day {p.day}</td>
+                              <td className="px-4 py-2 text-gray-600 text-xs">{p.surface}</td>
+                              <td className="px-4 py-2 text-center text-gray-500">{p.count}</td>
+                              <td className="px-4 py-2 text-center font-mono text-green-700">{p.minMC}%</td>
+                              <td className="px-4 py-2 text-center">
+                                <span className={`font-bold text-sm ${
+                                  isDry ? 'text-green-600' : isWet ? 'text-red-600' : 'text-yellow-600'
+                                }`}>{p.avgMC}%</span>
+                              </td>
+                              <td className="px-4 py-2 text-center font-mono text-red-600">{p.maxMC}%</td>
+                              <td className="px-4 py-2 text-center">
+                                {delta === null ? (
+                                  <span className="text-gray-300 text-xs">—</span>
+                                ) : delta < 0 ? (
+                                  <span className="text-green-600 text-xs font-bold flex items-center justify-center gap-0.5">
+                                    <TrendingDown className="w-3.5 h-3.5" />{delta.toFixed(1)}%
+                                  </span>
+                                ) : delta > 0 ? (
+                                  <span className="text-red-600 text-xs font-bold flex items-center justify-center gap-0.5">
+                                    <TrendingUp className="w-3.5 h-3.5" />+{delta.toFixed(1)}%
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-400 text-xs flex items-center justify-center gap-0.5">
+                                    <Minus className="w-3.5 h-3.5" />0%
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+
+                    <p className="text-[10px] text-gray-400 text-center">
+                      Dry goal reference: Drywall ≤{DRY_STD.drywall.dry}% · Wood ≤{DRY_STD.wood.dry}% · Concrete ≤{DRY_STD.concrete.dry}% · IICRC S500
+                    </p>
+                  </div>
                 )}
               </div>
             )}
