@@ -966,36 +966,82 @@ function SettingsContent() {
 // ─── Document Templates Section ────────────────────────────────────────────────
 function DocumentTemplatesSection({ userId }: { userId: string | null }) {
   const DOC_TYPES = [
-    { value: 'waf',                      label: 'Work Authorization Form'       },
-    { value: 'direction_to_pay',         label: 'Direction to Pay'              },
-    { value: 'assignment_of_benefits',   label: 'Assignment of Benefits'        },
-    { value: 'certificate_of_completion',label: 'Certificate of Completion'     },
-    { value: 'property_access',          label: 'Property Access Authorization' },
-    { value: 'contents_release',         label: 'Contents Inventory Release'    },
-    { value: 'photo_consent',            label: 'Photo/Video Consent'           },
-    { value: 'mold_auth',                label: 'Mold Remediation Authorization'},
-    { value: 'scope_of_work',            label: 'Scope of Work'                 },
-    { value: 'final_report',             label: 'Final Report'                  },
-    { value: 'proof_of_loss',            label: 'Proof of Loss'                 },
-    { value: 'staff_nda',                label: 'Staff NDA'                     },
-    { value: 'subcontractor_agreement',  label: 'Subcontractor Agreement'       },
-    { value: 'other',                    label: 'Other'                         },
+    { value: 'waf',                       label: 'Work Authorization Form'        },
+    { value: 'direction_to_pay',          label: 'Direction to Pay'               },
+    { value: 'assignment_of_benefits',    label: 'Assignment of Benefits'         },
+    { value: 'certificate_of_completion', label: 'Certificate of Completion'      },
+    { value: 'property_access',           label: 'Property Access Authorization'  },
+    { value: 'contents_release',          label: 'Contents Inventory Release'     },
+    { value: 'photo_consent',             label: 'Photo/Video Consent'            },
+    { value: 'mold_auth',                 label: 'Mold Remediation Authorization' },
+    { value: 'scope_of_work',             label: 'Scope of Work'                  },
+    { value: 'final_report',              label: 'Final Report'                   },
+    { value: 'proof_of_loss',             label: 'Proof of Loss'                  },
+    { value: 'staff_nda',                 label: 'Staff NDA'                      },
+    { value: 'subcontractor_agreement',   label: 'Subcontractor Agreement'        },
+    { value: 'other',                     label: 'Other'                          },
   ];
 
+  const MERGE_TAGS = [
+    { tag: '{{client_name}}',       label: 'Client Name'       },
+    { tag: '{{client_phone}}',      label: 'Client Phone'      },
+    { tag: '{{client_email}}',      label: 'Client Email'      },
+    { tag: '{{property_address}}',  label: 'Property Address'  },
+    { tag: '{{claim_number}}',      label: 'Claim Number'      },
+    { tag: '{{insurance_company}}', label: 'Insurance Co'      },
+    { tag: '{{adjuster_name}}',     label: 'Adjuster Name'     },
+    { tag: '{{adjuster_phone}}',    label: 'Adjuster Phone'    },
+    { tag: '{{date_of_loss}}',      label: 'Date of Loss'      },
+    { tag: '{{company_name}}',      label: 'Company Name'      },
+    { tag: '{{today_date}}',        label: 'Today\'s Date'     },
+    { tag: '{{sign_date}}',         label: 'Sign Date'         },
+  ];
+
+  const DEFAULT_BODY: Record<string, string> = {
+    waf: `<h2>WORK AUTHORIZATION FORM</h2>
+<p>This agreement is made between <strong>{{company_name}}</strong> ("Contractor") and <strong>{{client_name}}</strong> ("Client").</p>
+<p><strong>Property Address:</strong> {{property_address}}</p>
+<p><strong>Date of Loss:</strong> {{date_of_loss}}</p>
+<p><strong>Claim Number:</strong> {{claim_number}}</p>
+<p><strong>Insurance Company:</strong> {{insurance_company}}</p>
+<hr/>
+<p>The Client hereby authorizes the Contractor to perform all necessary water mitigation, drying, and restoration services at the above property. The Client agrees to cooperate fully with the Contractor and insurance company throughout the claims process.</p>
+<p><strong>Client:</strong> {{client_name}} | <strong>Phone:</strong> {{client_phone}}</p>
+<p><strong>Date:</strong> {{today_date}}</p>`,
+    direction_to_pay: `<h2>DIRECTION TO PAY</h2>
+<p>I/We, <strong>{{client_name}}</strong>, owner(s) of property located at <strong>{{property_address}}</strong>, hereby authorize and direct <strong>{{insurance_company}}</strong> to pay all proceeds due under Claim No. <strong>{{claim_number}}</strong> directly to <strong>{{company_name}}</strong> for services rendered.</p>
+<p><strong>Adjuster:</strong> {{adjuster_name}} | {{adjuster_phone}}</p>
+<p><strong>Date of Loss:</strong> {{date_of_loss}}</p>
+<p><strong>Date:</strong> {{today_date}}</p>`,
+  };
+
   interface Template {
-    id: string; name: string; doc_type: string; description: string | null;
-    file_name: string | null; requires_signature: boolean; is_active: boolean; created_at: string;
+    id: string;
+    name: string;
+    doc_type: string;
+    description: string | null;
+    file_name: string | null;
+    body_html: string | null;
+    requires_signature: boolean;
+    is_active: boolean;
+    created_at: string;
   }
 
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [showForm, setShowForm]   = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [form, setForm]           = useState({ name: '', doc_type: 'waf', description: '', requires_signature: true });
-  const [file, setFile]           = useState<File | null>(null);
-  const [ok, setOk]               = useState('');
-  const [err, setErr]             = useState('');
+  const [templates, setTemplates]   = useState<Template[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [showForm, setShowForm]     = useState(false);
+  const [editTemplate, setEditTemplate] = useState<Template | null>(null);
+  const [uploading, setUploading]   = useState(false);
+  const [activeTab, setActiveTab]   = useState<'editor'|'upload'>('editor');
+  const [form, setForm]             = useState({
+    name: '', doc_type: 'waf', description: '', requires_signature: true, body_html: '',
+  });
+  const [file, setFile]             = useState<File | null>(null);
+  const [ok, setOk]                 = useState('');
+  const [err, setErr]               = useState('');
+  const [previewMode, setPreviewMode] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -1007,16 +1053,55 @@ function DocumentTemplatesSection({ userId }: { userId: string | null }) {
       .then(({ data }) => { setTemplates((data as Template[]) || []); setLoading(false); });
   }, [userId]);
 
-  async function handleUpload(e: React.FormEvent) {
+  function openNew() {
+    setEditTemplate(null);
+    setForm({ name: '', doc_type: 'waf', description: '', requires_signature: true, body_html: DEFAULT_BODY['waf'] || '' });
+    setFile(null); setOk(''); setErr('');
+    setActiveTab('editor');
+    setPreviewMode(false);
+    setShowForm(true);
+  }
+
+  function openEdit(t: Template) {
+    setEditTemplate(t);
+    setForm({
+      name: t.name,
+      doc_type: t.doc_type,
+      description: t.description || '',
+      requires_signature: t.requires_signature,
+      body_html: t.body_html || DEFAULT_BODY[t.doc_type] || '',
+    });
+    setFile(null); setOk(''); setErr('');
+    setActiveTab('editor');
+    setPreviewMode(false);
+    setShowForm(true);
+  }
+
+  function insertTag(tag: string) {
+    const ta = bodyRef.current;
+    if (!ta) {
+      setForm(p => ({ ...p, body_html: p.body_html + tag }));
+      return;
+    }
+    const start = ta.selectionStart ?? ta.value.length;
+    const end   = ta.selectionEnd   ?? ta.value.length;
+    const newVal = ta.value.slice(0, start) + tag + ta.value.slice(end);
+    setForm(p => ({ ...p, body_html: newVal }));
+    setTimeout(() => {
+      ta.focus();
+      ta.setSelectionRange(start + tag.length, start + tag.length);
+    }, 0);
+  }
+
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!userId || !form.name || !form.doc_type) { setErr('Name and type are required.'); return; }
     setUploading(true); setErr(''); setOk('');
 
-    let storagePath: string | null = null;
-    let fileName: string | null = null;
+    let storagePath: string | null = editTemplate?.file_name ? (editTemplate as unknown as Record<string,string>)['storage_path'] : null;
+    let fileName: string | null = editTemplate?.file_name || null;
 
     if (file) {
-      const ext = file.name.split('.').pop();
       const path = `${userId}/${Date.now()}_${file.name}`;
       const { error: uploadErr } = await supabase.storage.from('document-templates').upload(path, file);
       if (uploadErr) { setErr(uploadErr.message); setUploading(false); return; }
@@ -1024,27 +1109,41 @@ function DocumentTemplatesSection({ userId }: { userId: string | null }) {
       fileName = file.name;
     }
 
-    const { data, error } = await supabase
-      .from('document_templates')
-      .insert({
-        company_id: userId,
-        name: form.name,
-        doc_type: form.doc_type,
-        description: form.description || null,
-        requires_signature: form.requires_signature,
-        storage_path: storagePath,
-        file_name: fileName,
-        is_active: true,
-      })
-      .select()
-      .single();
+    const payload = {
+      company_id: userId,
+      name: form.name,
+      doc_type: form.doc_type,
+      description: form.description || null,
+      requires_signature: form.requires_signature,
+      body_html: form.body_html || null,
+      storage_path: storagePath,
+      file_name: fileName,
+      is_active: true,
+    };
 
-    if (error) { setErr(error.message); setUploading(false); return; }
-    setTemplates(prev => [...prev, data as Template]);
-    setOk('Template added successfully!');
-    setForm({ name: '', doc_type: 'waf', description: '', requires_signature: true });
-    setFile(null);
+    if (editTemplate) {
+      const { data, error } = await supabase
+        .from('document_templates')
+        .update(payload)
+        .eq('id', editTemplate.id)
+        .select()
+        .single();
+      if (error) { setErr(error.message); setUploading(false); return; }
+      setTemplates(prev => prev.map(t => t.id === editTemplate.id ? data as Template : t));
+      setOk('Template updated!');
+    } else {
+      const { data, error } = await supabase
+        .from('document_templates')
+        .insert(payload)
+        .select()
+        .single();
+      if (error) { setErr(error.message); setUploading(false); return; }
+      setTemplates(prev => [...prev, data as Template]);
+      setOk('Template saved!');
+    }
+
     setShowForm(false);
+    setEditTemplate(null);
     setUploading(false);
   }
 
@@ -1059,30 +1158,30 @@ function DocumentTemplatesSection({ userId }: { userId: string | null }) {
     setTemplates(prev => prev.filter(t => t.id !== id));
   }
 
-  const MERGE_TAGS = [
-    '{{client_name}}','{{client_phone}}','{{client_email}}',
-    '{{property_address}}','{{claim_number}}','{{insurance_company}}',
-    '{{adjuster_name}}','{{date_of_loss}}','{{company_name}}','{{today_date}}',
-  ];
-
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Document Templates</h1>
         <p className="text-slate-400 text-sm mt-1">
-          Upload templates for WAF, Direction to Pay, and more. Job data auto-fills on send.
+          Create WAF, Direction to Pay, NDA and more. Job data auto-fills merge tags on send.
         </p>
       </div>
 
       {/* Merge tags guide */}
       <div className="bg-blue-900/20 border border-blue-800/40 rounded-xl p-4">
-        <p className="text-sm font-semibold text-blue-300 mb-2">Available Merge Tags</p>
-        <p className="text-xs text-blue-400/80 mb-2">Add these to your PDF/Word templates — they auto-fill from job data when sent:</p>
+        <p className="text-sm font-semibold text-blue-300 mb-2">📌 Merge Tags — click to copy</p>
+        <p className="text-xs text-blue-400/80 mb-2">Insert in template body — they auto-fill from job data when sent to clients:</p>
         <div className="flex flex-wrap gap-1.5">
-          {MERGE_TAGS.map(tag => (
-            <span key={tag} className="bg-blue-900/50 text-blue-200 text-[11px] font-mono px-2 py-0.5 rounded-lg border border-blue-800/60">
-              {tag}
-            </span>
+          {MERGE_TAGS.map(mt => (
+            <button
+              key={mt.tag}
+              type="button"
+              onClick={() => { navigator.clipboard.writeText(mt.tag); }}
+              title={`Copy ${mt.tag}`}
+              className="bg-blue-900/50 hover:bg-blue-800/70 text-blue-200 text-[11px] font-mono px-2 py-0.5 rounded-lg border border-blue-800/60 transition cursor-pointer"
+            >
+              {mt.tag}
+            </button>
           ))}
         </div>
       </div>
@@ -1096,23 +1195,30 @@ function DocumentTemplatesSection({ userId }: { userId: string | null }) {
       {/* Add template button */}
       {!showForm && (
         <button
-          onClick={() => { setShowForm(true); setErr(''); setOk(''); }}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition"
+          onClick={openNew}
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition shadow-lg shadow-blue-900/30"
         >
-          <Plus className="w-4 h-4" /> Add Template
+          <Plus className="w-4 h-4" /> New Template
         </button>
       )}
 
-      {/* Upload form */}
+      {/* Template form */}
       {showForm && (
-        <div className="bg-slate-800 rounded-xl border border-slate-700 p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-white text-sm">New Template</h3>
-            <button type="button" onClick={() => setShowForm(false)} className="text-slate-400 hover:text-white transition">
+        <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+          {/* Form header */}
+          <div className="flex items-center justify-between px-5 py-3 border-b border-slate-700 bg-slate-800/80">
+            <h3 className="font-semibold text-white text-sm flex items-center gap-2">
+              <FileText className="w-4 h-4 text-blue-400" />
+              {editTemplate ? `Edit: ${editTemplate.name}` : 'New Template'}
+            </h3>
+            <button type="button" onClick={() => { setShowForm(false); setEditTemplate(null); }}
+              className="text-slate-400 hover:text-white transition p-1">
               <X className="w-4 h-4" />
             </button>
           </div>
-          <form onSubmit={handleUpload} className="space-y-3">
+
+          <form onSubmit={handleSave} className="p-5 space-y-4">
+            {/* Name + Type */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wide">Template Name *</label>
@@ -1122,42 +1228,125 @@ function DocumentTemplatesSection({ userId }: { userId: string | null }) {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wide">Document Type *</label>
-                <select value={form.doc_type} onChange={e => setForm(p => ({ ...p, doc_type: e.target.value }))}
+                <select value={form.doc_type}
+                  onChange={e => {
+                    const dt = e.target.value;
+                    setForm(p => ({
+                      ...p,
+                      doc_type: dt,
+                      body_html: p.body_html || DEFAULT_BODY[dt] || '',
+                    }));
+                  }}
                   className="w-full bg-slate-700 border border-slate-600 text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500 transition">
                   {DOC_TYPES.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
                 </select>
               </div>
             </div>
+
+            {/* Description */}
             <div>
               <label className="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wide">Description</label>
-              <input type="text" placeholder="Optional description"
+              <input type="text" placeholder="Optional short description"
                 value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
                 className="w-full bg-slate-700 border border-slate-600 text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500 transition" />
             </div>
+
+            {/* Requires signature */}
             <div className="flex items-center gap-3">
               <input type="checkbox" id="req_sig" checked={form.requires_signature}
                 onChange={e => setForm(p => ({ ...p, requires_signature: e.target.checked }))}
-                className="w-4 h-4 rounded bg-slate-700 border-slate-600 text-blue-600" />
-              <label htmlFor="req_sig" className="text-sm text-slate-300">Requires client signature</label>
+                className="w-4 h-4 rounded bg-slate-700 border-slate-600 text-blue-600 focus:ring-blue-500" />
+              <label htmlFor="req_sig" className="text-sm text-slate-300">Requires client e-signature</label>
             </div>
+
+            {/* Editor / Upload tabs */}
             <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wide">
-                Upload File (PDF/DOC optional)
-              </label>
-              <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.jpg,.png"
-                onChange={e => setFile(e.target.files?.[0] || null)}
-                className="w-full bg-slate-700 border border-slate-600 text-slate-300 rounded-xl px-3 py-2 text-sm file:mr-3 file:bg-blue-600 file:text-white file:rounded-lg file:border-0 file:text-xs file:font-semibold" />
+              <div className="flex rounded-xl overflow-hidden border border-slate-600 mb-3 w-fit">
+                <button type="button" onClick={() => setActiveTab('editor')}
+                  className={`px-4 py-1.5 text-xs font-semibold transition ${activeTab === 'editor' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}>
+                  ✍️ Template Editor
+                </button>
+                <button type="button" onClick={() => setActiveTab('upload')}
+                  className={`px-4 py-1.5 text-xs font-semibold transition ${activeTab === 'upload' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}>
+                  📎 Upload PDF/DOC
+                </button>
+              </div>
+
+              {activeTab === 'editor' && (
+                <div className="space-y-2">
+                  {/* Quick-insert merge tags */}
+                  <div>
+                    <p className="text-[11px] text-slate-500 mb-1.5 font-semibold uppercase tracking-wide">Quick Insert →</p>
+                    <div className="flex flex-wrap gap-1">
+                      {MERGE_TAGS.map(mt => (
+                        <button key={mt.tag} type="button" onClick={() => insertTag(mt.tag)}
+                          className="text-[10px] font-mono bg-slate-700 hover:bg-blue-800/60 text-slate-300 hover:text-blue-200 px-2 py-0.5 rounded border border-slate-600 hover:border-blue-700 transition">
+                          {mt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Toggle preview */}
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Document Body (HTML / Plain Text)</label>
+                    <button type="button" onClick={() => setPreviewMode(p => !p)}
+                      className="text-xs text-blue-400 hover:text-blue-300 font-semibold transition flex items-center gap-1">
+                      <Eye className="w-3 h-3" /> {previewMode ? 'Edit' : 'Preview'}
+                    </button>
+                  </div>
+
+                  {previewMode ? (
+                    <div
+                      className="bg-white text-gray-800 rounded-xl p-4 text-sm leading-relaxed min-h-[200px] border border-slate-600 overflow-y-auto"
+                      dangerouslySetInnerHTML={{ __html: form.body_html || '<p class="text-gray-400 italic">No content yet.</p>' }}
+                    />
+                  ) : (
+                    <textarea
+                      ref={bodyRef}
+                      rows={10}
+                      placeholder="Type document content here. Use HTML tags for formatting (<h2>, <p>, <strong>, <hr/>). Insert merge tags using buttons above."
+                      value={form.body_html}
+                      onChange={e => setForm(p => ({ ...p, body_html: e.target.value }))}
+                      className="w-full bg-slate-700 border border-slate-600 text-slate-100 rounded-xl px-3 py-2 text-xs font-mono focus:outline-none focus:border-blue-500 transition resize-y leading-relaxed"
+                      spellCheck={false}
+                    />
+                  )}
+                  <p className="text-[10px] text-slate-500">
+                    Supports basic HTML tags. Merge tags will be auto-replaced with job data when sent to the client.
+                  </p>
+                </div>
+              )}
+
+              {activeTab === 'upload' && (
+                <div className="space-y-2">
+                  <label className="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wide">
+                    Upload Template File (PDF, DOC, DOCX)
+                  </label>
+                  <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.jpg,.png"
+                    onChange={e => setFile(e.target.files?.[0] || null)}
+                    className="w-full bg-slate-700 border border-slate-600 text-slate-300 rounded-xl px-3 py-2 text-sm file:mr-3 file:bg-blue-600 file:text-white file:rounded-lg file:border-0 file:text-xs file:font-semibold" />
+                  <p className="text-[10px] text-slate-500">PDF/Word file will be stored for reference. Use template editor for auto-fill content.</p>
+                  {editTemplate?.file_name && !file && (
+                    <p className="text-xs text-teal-400 flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3" /> Current file: {editTemplate.file_name}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
+
             {err && <div className="bg-red-900/30 border border-red-800/60 rounded-xl p-3 text-sm text-red-300">{err}</div>}
+
             <div className="flex gap-2 pt-1">
-              <button type="button" onClick={() => setShowForm(false)}
+              <button type="button" onClick={() => { setShowForm(false); setEditTemplate(null); }}
                 className="flex-1 px-3 py-2 rounded-xl bg-slate-700 text-slate-300 text-sm font-semibold hover:bg-slate-600 transition">
                 Cancel
               </button>
               <button type="submit" disabled={uploading}
                 className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-semibold transition">
-                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                {uploading ? 'Uploading…' : 'Save Template'}
+                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                {uploading ? 'Saving…' : editTemplate ? 'Update Template' : 'Save Template'}
               </button>
             </div>
           </form>
@@ -1173,7 +1362,7 @@ function DocumentTemplatesSection({ userId }: { userId: string | null }) {
         <div className="bg-slate-800/60 rounded-xl border border-slate-700 border-dashed p-8 text-center">
           <FileText className="w-8 h-8 text-slate-600 mx-auto mb-2" />
           <p className="text-slate-400 text-sm font-medium">No templates yet</p>
-          <p className="text-slate-500 text-xs mt-1">Add your WAF, Direction to Pay, and other documents above.</p>
+          <p className="text-slate-500 text-xs mt-1">Create your WAF, Direction to Pay, NDA, and other documents above.</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -1182,12 +1371,20 @@ function DocumentTemplatesSection({ userId }: { userId: string | null }) {
               <FileText className="w-5 h-5 text-blue-400 shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-white truncate">{t.name}</p>
-                <p className="text-xs text-slate-500">{DOC_TYPES.find(d => d.value === t.doc_type)?.label || t.doc_type}</p>
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                  <p className="text-xs text-slate-500">{DOC_TYPES.find(d => d.value === t.doc_type)?.label || t.doc_type}</p>
+                  {t.body_html && <span className="text-[10px] bg-teal-900/40 text-teal-300 px-1.5 py-0 rounded font-semibold">✍️ Inline</span>}
+                  {t.file_name && <span className="text-[10px] bg-slate-700 text-slate-400 px-1.5 py-0 rounded font-semibold">📎 {t.file_name}</span>}
+                </div>
               </div>
               {t.requires_signature && (
-                <span className="text-[10px] bg-blue-900/40 text-blue-300 px-2 py-0.5 rounded-full font-semibold shrink-0">Signature</span>
+                <span className="text-[10px] bg-blue-900/40 text-blue-300 px-2 py-0.5 rounded-full font-semibold shrink-0">Sig</span>
               )}
               <div className="flex items-center gap-1 shrink-0">
+                <button onClick={() => openEdit(t)} title="Edit template"
+                  className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-slate-700 rounded-lg transition">
+                  <Edit3 className="w-4 h-4" />
+                </button>
                 <button onClick={() => toggleActive(t)} title={t.is_active ? 'Deactivate' : 'Activate'}
                   className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-slate-700 rounded-lg transition">
                   {t.is_active ? <ToggleRight className="w-4 h-4 text-blue-400" /> : <ToggleLeft className="w-4 h-4" />}

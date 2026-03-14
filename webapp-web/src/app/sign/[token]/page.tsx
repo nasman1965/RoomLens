@@ -10,6 +10,7 @@ interface JobDoc {
   doc_type: string;
   status: string;
   filled_data: Record<string, string>;
+  body_html_filled: string | null;
   sign_token: string;
   sign_token_expires: string;
   signed_at: string | null;
@@ -257,8 +258,6 @@ export default function SignPage() {
   // ── Main signing view ────────────────────────────────────────────────────────
   if (!doc) return null;
 
-  const filledData = doc.filled_data || {};
-
   return (
     <div className="min-h-screen bg-slate-100 py-8 px-4">
       <div className="max-w-lg mx-auto space-y-5">
@@ -283,21 +282,36 @@ export default function SignPage() {
             <h1 className="text-xl font-bold text-white mt-0.5">{doc.name}</h1>
           </div>
 
-          <div className="p-5 space-y-3">
-            {/* Auto-filled details */}
-            {[
-              { label: 'Client', value: filledData['{{client_name}}'] },
-              { label: 'Property', value: filledData['{{property_address}}'] },
-              { label: 'Claim #', value: filledData['{{claim_number}}'] },
-              { label: 'Insurance', value: filledData['{{insurance_company}}'] },
-              { label: 'Date of Loss', value: filledData['{{date_of_loss}}'] },
-              { label: 'Company', value: filledData['{{company_name}}'] },
-            ].filter(f => f.value).map(f => (
-              <div key={f.label} className="flex items-center gap-3 text-sm border-b border-gray-100 pb-2 last:border-0">
-                <span className="text-gray-400 w-24 shrink-0">{f.label}</span>
-                <span className="font-medium text-gray-800">{f.value}</span>
+          <div className="p-5">
+            {/* Rendered template body (if available) */}
+            {doc.body_html_filled ? (
+              <div
+                className="prose prose-sm max-w-none text-gray-800 leading-relaxed"
+                style={{
+                  fontFamily: 'system-ui, sans-serif',
+                  fontSize: '14px',
+                  lineHeight: '1.6',
+                }}
+                dangerouslySetInnerHTML={{ __html: doc.body_html_filled }}
+              />
+            ) : (
+              /* Fallback: show key/value fields from filled_data */
+              <div className="space-y-3">
+                {[
+                  { label: 'Client',      value: (doc.filled_data || {})['{{client_name}}'] },
+                  { label: 'Property',    value: (doc.filled_data || {})['{{property_address}}'] },
+                  { label: 'Claim #',     value: (doc.filled_data || {})['{{claim_number}}'] },
+                  { label: 'Insurance',   value: (doc.filled_data || {})['{{insurance_company}}'] },
+                  { label: 'Date of Loss',value: (doc.filled_data || {})['{{date_of_loss}}'] },
+                  { label: 'Company',     value: (doc.filled_data || {})['{{company_name}}'] },
+                ].filter(f => f.value).map(f => (
+                  <div key={f.label} className="flex items-center gap-3 text-sm border-b border-gray-100 pb-2 last:border-0">
+                    <span className="text-gray-400 w-24 shrink-0">{f.label}</span>
+                    <span className="font-medium text-gray-800">{f.value}</span>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         </div>
 

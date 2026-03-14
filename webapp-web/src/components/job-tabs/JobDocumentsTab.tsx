@@ -14,6 +14,7 @@ interface Template {
   doc_type: string;
   description: string | null;
   file_name: string | null;
+  body_html: string | null;
   requires_signature: boolean;
   is_active: boolean;
   merge_tags: MergeTag[];
@@ -32,6 +33,7 @@ interface JobDocument {
   signed_by_name: string | null;
   sign_token: string;
   sign_token_expires: string;
+  body_html_filled: string | null;
   created_at: string;
 }
 interface JobData {
@@ -207,6 +209,9 @@ export default function JobDocumentsTab({ jobId, jobData }: Props) {
       filled[mt.tag] = val;
     });
 
+    // Render body_html with merge tags replaced
+    const bodyFilled = selTemplate.body_html ? mergeTags(selTemplate.body_html, jobData) : null;
+
     const { data: doc, error } = await supabase
       .from('job_documents')
       .insert({
@@ -216,6 +221,7 @@ export default function JobDocumentsTab({ jobId, jobData }: Props) {
         name: selTemplate.name,
         status: sendEmail || sendPhone ? 'sent' : 'draft',
         filled_data: filled,
+        body_html_filled: bodyFilled,
         sent_to_email: sendEmail || null,
         sent_to_phone: sendPhone || null,
         sent_at: sendEmail || sendPhone ? new Date().toISOString() : null,
