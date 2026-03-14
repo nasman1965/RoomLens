@@ -3,8 +3,9 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import {
   Camera, X, ZoomIn, Trash2, Loader2, Plus, Tag, Info,
-  ChevronDown, ChevronLeft, ChevronRight, RotateCw,
-  AlertTriangle, CheckCircle2, Layers, ImageOff, Maximize2
+  ChevronDown, ChevronLeft, ChevronRight,
+  AlertTriangle, CheckCircle2, Layers, ImageOff, Maximize2,
+  FolderOpen, Aperture,
 } from 'lucide-react';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -15,7 +16,7 @@ interface Photo {
   damage_tag: string | null;
   area: string | null;
   timestamp: string;
-  photo_source?: string;      // 'standard' | 'insta360' | 'external'
+  photo_source?: string;
   is_360?: boolean;
   thumbnail_url?: string | null;
   notes?: string | null;
@@ -25,19 +26,19 @@ interface Photo {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const DAMAGE_TAGS = [
-  { value: 'pre_existing',  label: 'Before',     emoji: '📷', color: 'bg-slate-700 text-slate-300',            border: 'border-slate-500'   },
-  { value: 'water_damage',  label: 'Water',       emoji: '💧', color: 'bg-blue-900/60 text-blue-300',           border: 'border-blue-500'    },
-  { value: 'mold',          label: 'Mold',        emoji: '🟢', color: 'bg-emerald-900/60 text-emerald-300',     border: 'border-emerald-500' },
-  { value: 'structural',    label: 'Structural',  emoji: '🏗️', color: 'bg-orange-900/60 text-orange-300',       border: 'border-orange-500'  },
-  { value: 'equipment',     label: 'Equipment',   emoji: '⚙️', color: 'bg-purple-900/60 text-purple-300',       border: 'border-purple-500'  },
-  { value: 'after',         label: 'After',       emoji: '✅', color: 'bg-teal-900/60 text-teal-300',           border: 'border-teal-500'    },
+  { value: 'pre_existing',  label: 'Before',    emoji: '📷', color: 'bg-slate-700 text-slate-300',            border: 'border-slate-500'   },
+  { value: 'water_damage',  label: 'Water',      emoji: '💧', color: 'bg-blue-900/60 text-blue-300',           border: 'border-blue-500'    },
+  { value: 'mold',          label: 'Mold',       emoji: '🟢', color: 'bg-emerald-900/60 text-emerald-300',     border: 'border-emerald-500' },
+  { value: 'structural',    label: 'Structural', emoji: '🏗️', color: 'bg-orange-900/60 text-orange-300',       border: 'border-orange-500'  },
+  { value: 'equipment',     label: 'Equipment',  emoji: '⚙️', color: 'bg-purple-900/60 text-purple-300',       border: 'border-purple-500'  },
+  { value: 'after',         label: 'After',      emoji: '✅', color: 'bg-teal-900/60 text-teal-300',           border: 'border-teal-500'    },
 ];
 
 const SEVERITY_LEVELS = [
-  { value: 'low',      label: 'Low',      color: 'text-green-400',   dot: 'bg-green-400'   },
-  { value: 'medium',   label: 'Medium',   color: 'text-yellow-400',  dot: 'bg-yellow-400'  },
-  { value: 'high',     label: 'High',     color: 'text-orange-400',  dot: 'bg-orange-400'  },
-  { value: 'critical', label: 'Critical', color: 'text-red-400',     dot: 'bg-red-400'     },
+  { value: 'low',      label: 'Low',      color: 'text-green-400',  dot: 'bg-green-400'  },
+  { value: 'medium',   label: 'Medium',   color: 'text-yellow-400', dot: 'bg-yellow-400' },
+  { value: 'high',     label: 'High',     color: 'text-orange-400', dot: 'bg-orange-400' },
+  { value: 'critical', label: 'Critical', color: 'text-red-400',    dot: 'bg-red-400'    },
 ];
 
 const ROOM_TAGS = [
@@ -46,29 +47,9 @@ const ROOM_TAGS = [
   'Attic','Exterior','Roof','Other',
 ];
 
-const PHOTO_SOURCES = [
-  {
-    value: 'standard',
-    label: 'Standard Camera',
-    sublabel: 'Phone, DSLR, or any camera',
-    icon: '📱',
-    tip: 'Regular flat JPEG/PNG photos',
-    accept: 'image/*',
-  },
-  {
-    value: 'insta360',
-    label: 'Insta360 X4',
-    sublabel: '360° documentation camera',
-    icon: '🔵',
-    tip: 'Export as flat JPEG from Insta360 app before uploading. For 360 viewer, upload equirectangular JPEG.',
-    accept: 'image/jpeg,image/jpg,image/png',
-  },
-];
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-const tagInfo   = (val: string) => DAMAGE_TAGS.find(t => t.value === val);
-const sevInfo   = (val: string) => SEVERITY_LEVELS.find(s => s.value === val);
-const sourceInfo = (val: string) => PHOTO_SOURCES.find(s => s.value === val);
+const tagInfo = (val: string) => DAMAGE_TAGS.find(t => t.value === val);
+const sevInfo = (val: string) => SEVERITY_LEVELS.find(s => s.value === val);
 
 function groupByRoom(photos: Photo[]) {
   const map: Record<string, Photo[]> = {};
@@ -82,34 +63,34 @@ function groupByRoom(photos: Photo[]) {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId: string }) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Two separate file inputs: one for camera capture, one for library/files
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef   = useRef<HTMLInputElement>(null);
 
-  const [photos,       setPhotos]       = useState<Photo[]>([]);
-  const [loading,      setLoading]      = useState(true);
-  const [uploading,    setUploading]    = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [lightbox,     setLightbox]     = useState<Photo | null>(null);
-  const [lbIdx,        setLbIdx]        = useState(0);
-  const [filter,       setFilter]       = useState('all');
-  const [viewMode,     setViewMode]     = useState<'grid' | 'room'>('grid');
-  const [error,        setError]        = useState('');
-  const [success,      setSuccess]      = useState('');
+  const [photos,          setPhotos]          = useState<Photo[]>([]);
+  const [loading,         setLoading]         = useState(true);
+  const [uploading,       setUploading]       = useState(false);
+  const [uploadProgress,  setUploadProgress]  = useState(0);
+  const [lightbox,        setLightbox]        = useState<Photo | null>(null);
+  const [lbIdx,           setLbIdx]           = useState(0);
+  const [filter,          setFilter]          = useState('all');
+  const [viewMode,        setViewMode]        = useState<'grid' | 'room'>('grid');
+  const [error,           setError]           = useState('');
+  const [success,         setSuccess]         = useState('');
+  const [showTagForm,     setShowTagForm]      = useState(true);
 
-  // Upload tag form
-  const [showTagForm,  setShowTagForm]  = useState(true);
   const [tagForm, setTagForm] = useState({
     room_tag:        '',
     damage_tag:      'water_damage',
     area:            '',
-    photo_source:    'standard',
+    photo_source:    'standard',  // 'standard' | 'insta360'
     is_360:          false,
     notes:           '',
     damage_severity: 'medium',
   });
 
-  // Lightbox edit state
-  const [editing,   setEditing]   = useState(false);
-  const [editForm,  setEditForm]  = useState<Partial<typeof tagForm>>({});
+  const [editing,  setEditing]  = useState(false);
+  const [editForm, setEditForm] = useState<Partial<typeof tagForm>>({});
 
   // ─── Load photos ──────────────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -132,24 +113,38 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
 
   useEffect(() => { load(); }, [load]);
 
-  // ─── Upload ───────────────────────────────────────────────────────────────
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
+  // ─── Core upload logic ────────────────────────────────────────────────────
+  const uploadFiles = async (files: File[]) => {
     if (!files.length) return;
     setUploading(true); setError(''); setUploadProgress(0);
 
+    let successCount = 0;
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setError(`Skipped "${file.name}" — not an image file.`);
+        continue;
+      }
+
       const ext  = file.name.split('.').pop()?.toLowerCase() || 'jpg';
       const path = `${userId}/${jobId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
 
       const { error: storageErr } = await supabase.storage
-        .from('job-photos').upload(path, file, { contentType: file.type });
-      if (storageErr) { setError(storageErr.message); continue; }
+        .from('job-photos')
+        .upload(path, file, { contentType: file.type, upsert: false });
 
+      if (storageErr) {
+        console.error('Storage upload error:', storageErr);
+        setError(`Upload failed: ${storageErr.message}`);
+        continue;
+      }
+
+      // Build public URL
       const { data: { publicUrl } } = supabase.storage.from('job-photos').getPublicUrl(path);
 
-      const { data: record } = await supabase.from('job_photos').insert({
+      const { data: record, error: dbErr } = await supabase.from('job_photos').insert({
         job_id:          jobId,
         photo_url:       publicUrl,
         room_tag:        tagForm.room_tag        || null,
@@ -162,21 +157,39 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
         damage_severity: tagForm.damage_severity  || null,
       }).select().single();
 
-      if (record) setPhotos(prev => [{ ...record, signedUrl: publicUrl }, ...prev]);
+      if (dbErr) {
+        console.error('DB insert error:', dbErr);
+        setError(`Saved to storage but DB record failed: ${dbErr.message}`);
+        continue;
+      }
+
+      if (record) {
+        setPhotos(prev => [{ ...record, signedUrl: publicUrl }, ...prev]);
+        successCount++;
+      }
+
       setUploadProgress(Math.round(((i + 1) / files.length) * 100));
     }
 
     setUploading(false);
-    setSuccess(`${files.length} photo${files.length > 1 ? 's' : ''} uploaded ✅`);
-    setTimeout(() => setSuccess(''), 4000);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (successCount > 0) {
+      setSuccess(`${successCount} photo${successCount > 1 ? 's' : ''} uploaded ✅`);
+      setTimeout(() => setSuccess(''), 4000);
+    }
+    // Reset both inputs
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+    if (fileInputRef.current)   fileInputRef.current.value   = '';
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    uploadFiles(Array.from(e.target.files || []));
   };
 
   // ─── Delete ───────────────────────────────────────────────────────────────
   const deletePhoto = async (photo: Photo) => {
     if (!confirm('Delete this photo?')) return;
     const pathPart = photo.photo_url.split('/job-photos/')[1];
-    if (pathPart) await supabase.storage.from('job-photos').remove([pathPart]);
+    if (pathPart) await supabase.storage.from('job-photos').remove([decodeURIComponent(pathPart.split('?')[0])]);
     await supabase.from('job_photos').delete().eq('id', photo.id);
     setPhotos(prev => prev.filter(p => p.id !== photo.id));
     if (lightbox?.id === photo.id) setLightbox(null);
@@ -235,7 +248,7 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
     count: photos.filter(p => p.damage_tag === t.value).length,
   })).filter(t => t.count > 0);
 
-  const i360Count = photos.filter(p => p.photo_source === 'insta360').length;
+  const i360Count  = photos.filter(p => p.photo_source === 'insta360').length;
   const roomGroups = groupByRoom(photos);
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -246,7 +259,7 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
   );
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
 
       {/* ─── Stats Bar ─────────────────────────────────────────── */}
       {photos.length > 0 && (
@@ -272,37 +285,106 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
         </div>
       )}
 
-      {/* ─── Insta360 Info Banner ────────────────────────────────── */}
-      <div className="bg-slate-800/50 border border-cyan-500/20 rounded-xl p-4">
-        <div className="flex items-start gap-3">
-          <div className="text-2xl mt-0.5">🔵</div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-sm font-bold text-white">Insta360 X4</span>
-              <span className="text-[10px] px-2 py-0.5 bg-cyan-500/20 text-cyan-400 rounded-full font-medium">360° Documentation</span>
+      {/* ─── Upload Section (Camera vs Files) ───────────────────── */}
+      <div className="bg-slate-800/60 border border-slate-600/40 rounded-2xl overflow-hidden">
+
+        {/* Header */}
+        <div className="px-4 pt-4 pb-2">
+          <h3 className="text-sm font-bold text-white flex items-center gap-2">
+            <Camera className="w-4 h-4 text-cyan-400" />
+            Add Photos
+          </h3>
+          <p className="text-xs text-slate-400 mt-0.5">Choose how you want to add photos to this job</p>
+        </div>
+
+        {/* Two big upload buttons */}
+        <div className="grid grid-cols-2 gap-3 px-4 pb-4">
+
+          {/* Take Photo — opens camera directly */}
+          <button
+            type="button"
+            onClick={() => cameraInputRef.current?.click()}
+            disabled={uploading}
+            className="flex flex-col items-center justify-center gap-2 bg-cyan-500/10 hover:bg-cyan-500/20 border-2 border-cyan-500/40 hover:border-cyan-500/70 disabled:opacity-50 rounded-xl py-5 px-3 transition group"
+          >
+            <div className="w-10 h-10 rounded-full bg-cyan-500/20 flex items-center justify-center group-hover:bg-cyan-500/30 transition">
+              <Camera className="w-5 h-5 text-cyan-400" />
             </div>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              For accurate damage documentation: shoot in 360° mode, then export as <strong className="text-white">flat JPEG</strong> from the Insta360 app before uploading. 
-              The 360° viewer works with equirectangular JPEGs — toggle &quot;Is 360°&quot; when uploading those files.
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <span className="text-[10px] px-2 py-1 bg-slate-700/60 text-slate-300 rounded-lg">📐 Full room capture in one shot</span>
-              <span className="text-[10px] px-2 py-1 bg-slate-700/60 text-slate-300 rounded-lg">💧 All damage angles documented</span>
-              <span className="text-[10px] px-2 py-1 bg-slate-700/60 text-slate-300 rounded-lg">📋 Xactimate-ready evidence</span>
+            <div className="text-center">
+              <div className="text-sm font-bold text-white">Take Photo</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Open camera</div>
+            </div>
+          </button>
+
+          {/* Upload from Files — opens file library */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="flex flex-col items-center justify-center gap-2 bg-slate-700/40 hover:bg-slate-700/70 border-2 border-slate-600/40 hover:border-slate-500/70 disabled:opacity-50 rounded-xl py-5 px-3 transition group"
+          >
+            <div className="w-10 h-10 rounded-full bg-slate-600/40 flex items-center justify-center group-hover:bg-slate-600/60 transition">
+              <FolderOpen className="w-5 h-5 text-slate-300" />
+            </div>
+            <div className="text-center">
+              <div className="text-sm font-bold text-white">Upload Files</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Gallery / Files app</div>
+            </div>
+          </button>
+        </div>
+
+        {/* Upload progress bar */}
+        {uploading && (
+          <div className="px-4 pb-4">
+            <div className="flex items-center gap-3 bg-slate-900/60 rounded-xl px-4 py-3">
+              <Loader2 className="w-4 h-4 text-cyan-400 animate-spin shrink-0" />
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-white font-medium">Uploading photos…</span>
+                  <span className="text-xs text-cyan-400 font-bold">{uploadProgress}%</span>
+                </div>
+                <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-cyan-500 rounded-full transition-all duration-300"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* Hidden file inputs — CRITICAL: no capture on file input, capture=environment on camera */}
+        {/* Camera input: opens device camera directly */}
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          multiple
+          className="hidden"
+          onChange={handleFileChange}
+        />
+        {/* File input: opens file picker / gallery — NO capture attribute */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/jpg,image/png,image/webp,image/heic,image/heif"
+          multiple
+          className="hidden"
+          onChange={handleFileChange}
+        />
       </div>
 
-      {/* ─── Tag Form (Upload Settings) ──────────────────────────── */}
+      {/* ─── Tag Form (collapsible) ────────────────────────────── */}
       <div className="bg-slate-800/60 border border-slate-600/40 rounded-xl overflow-hidden">
         <button
           onClick={() => setShowTagForm(!showTagForm)}
           className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-700/40 transition"
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Tag className="w-4 h-4 text-cyan-400" />
-            <span className="text-sm font-semibold text-white">Upload Settings — Tags & Source</span>
+            <span className="text-sm font-semibold text-white">Photo Tags</span>
             {tagForm.room_tag && (
               <span className="text-xs px-2 py-0.5 bg-slate-700 text-slate-300 rounded-full">{tagForm.room_tag}</span>
             )}
@@ -311,63 +393,76 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
                 {tagInfo(tagForm.damage_tag)?.emoji} {tagInfo(tagForm.damage_tag)?.label}
               </span>
             )}
+            {tagForm.photo_source === 'insta360' && (
+              <span className="text-[10px] px-2 py-0.5 bg-cyan-500/20 text-cyan-400 rounded-full">🔵 Insta360</span>
+            )}
           </div>
-          <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showTagForm ? 'rotate-180' : ''}`} />
+          <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform shrink-0 ${showTagForm ? 'rotate-180' : ''}`} />
         </button>
 
         {showTagForm && (
-          <div className="px-4 pb-4 space-y-4 border-t border-slate-700/50">
+          <div className="px-4 pb-4 space-y-4 border-t border-slate-700/50 pt-4">
 
-            {/* Photo Source */}
-            <div className="pt-4">
+            {/* Photo Source selector */}
+            <div>
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                📷 Photo Source
+                📷 Camera Source
               </label>
               <div className="grid grid-cols-2 gap-2">
-                {PHOTO_SOURCES.map(src => (
+                {[
+                  { value: 'standard', label: 'Standard Camera', sub: 'Phone, DSLR', icon: '📱' },
+                  { value: 'insta360', label: 'Insta360 X4',     sub: '360° camera',  icon: '🔵' },
+                ].map(src => (
                   <button
                     key={src.value}
-                    onClick={() => setTagForm(p => ({ ...p, photo_source: src.value }))}
-                    className={`flex items-start gap-3 p-3 rounded-xl border text-left transition ${
+                    type="button"
+                    onClick={() => setTagForm(p => ({
+                      ...p,
+                      photo_source: src.value,
+                      is_360: src.value !== 'insta360' ? false : p.is_360,
+                    }))}
+                    className={`flex items-center gap-3 p-3 rounded-xl border text-left transition ${
                       tagForm.photo_source === src.value
                         ? 'bg-cyan-500/15 border-cyan-500/60 ring-1 ring-cyan-500/40'
                         : 'bg-slate-700/30 border-slate-600/40 hover:border-slate-500/60'
                     }`}
                   >
-                    <span className="text-xl mt-0.5">{src.icon}</span>
+                    <span className="text-xl">{src.icon}</span>
                     <div>
-                      <div className="text-xs font-bold text-white">{src.label}</div>
-                      <div className="text-[10px] text-slate-400 mt-0.5">{src.sublabel}</div>
+                      <div className="text-xs font-bold text-white leading-tight">{src.label}</div>
+                      <div className="text-[10px] text-slate-400">{src.sub}</div>
                     </div>
                   </button>
                 ))}
               </div>
-              {/* 360 toggle – only show for insta360 */}
+
+              {/* 360 toggle — only for Insta360 */}
               {tagForm.photo_source === 'insta360' && (
-                <label className="mt-2 flex items-center gap-2 cursor-pointer select-none">
-                  <div
-                    onClick={() => setTagForm(p => ({ ...p, is_360: !p.is_360 }))}
-                    className={`w-10 h-5 rounded-full transition relative ${tagForm.is_360 ? 'bg-cyan-500' : 'bg-slate-600'}`}
-                  >
-                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${tagForm.is_360 ? 'left-5' : 'left-0.5'}`} />
-                  </div>
-                  <span className="text-xs text-slate-300">Equirectangular 360° JPEG</span>
-                  <span className="text-[10px] text-slate-500">(enables 360 viewer)</span>
-                </label>
+                <div className="mt-3 bg-cyan-900/20 border border-cyan-700/30 rounded-xl p-3">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <div
+                      onClick={() => setTagForm(p => ({ ...p, is_360: !p.is_360 }))}
+                      className={`w-10 h-5 rounded-full relative flex-shrink-0 transition ${tagForm.is_360 ? 'bg-cyan-500' : 'bg-slate-600'}`}
+                    >
+                      <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${tagForm.is_360 ? 'left-5' : 'left-0.5'}`} />
+                    </div>
+                    <div>
+                      <div className="text-xs font-semibold text-white">Equirectangular 360° JPEG</div>
+                      <div className="text-[10px] text-slate-400">Toggle ON for 360° viewer. Export as flat JPEG from Insta360 app first.</div>
+                    </div>
+                  </label>
+                </div>
               )}
-              <p className="mt-1.5 text-[10px] text-cyan-400/60">
-                {sourceInfo(tagForm.photo_source)?.tip}
-              </p>
             </div>
 
-            {/* Room + Damage Type + Severity */}
-            <div className="grid grid-cols-3 gap-3">
+            {/* Room / Damage / Severity — stacked on mobile */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Room</label>
                 <select
                   value={tagForm.room_tag}
                   onChange={e => setTagForm(p => ({ ...p, room_tag: e.target.value }))}
-                  className="w-full px-2 py-1.5 bg-slate-700/50 border border-slate-600/50 rounded-lg text-sm text-white outline-none focus:ring-1 focus:ring-cyan-500"
+                  className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-sm text-white outline-none focus:ring-1 focus:ring-cyan-500"
                 >
                   <option value="">— No room —</option>
                   {ROOM_TAGS.map(r => <option key={r} value={r}>{r}</option>)}
@@ -378,7 +473,7 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
                 <select
                   value={tagForm.damage_tag}
                   onChange={e => setTagForm(p => ({ ...p, damage_tag: e.target.value }))}
-                  className="w-full px-2 py-1.5 bg-slate-700/50 border border-slate-600/50 rounded-lg text-sm text-white outline-none focus:ring-1 focus:ring-cyan-500"
+                  className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-sm text-white outline-none focus:ring-1 focus:ring-cyan-500"
                 >
                   {DAMAGE_TAGS.map(t => <option key={t.value} value={t.value}>{t.emoji} {t.label}</option>)}
                 </select>
@@ -388,15 +483,15 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
                 <select
                   value={tagForm.damage_severity}
                   onChange={e => setTagForm(p => ({ ...p, damage_severity: e.target.value }))}
-                  className="w-full px-2 py-1.5 bg-slate-700/50 border border-slate-600/50 rounded-lg text-sm text-white outline-none focus:ring-1 focus:ring-cyan-500"
+                  className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-sm text-white outline-none focus:ring-1 focus:ring-cyan-500"
                 >
                   {SEVERITY_LEVELS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                 </select>
               </div>
             </div>
 
-            {/* Area note + Notes */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* Area + Notes */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Area / Location</label>
                 <input
@@ -404,7 +499,7 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
                   value={tagForm.area}
                   onChange={e => setTagForm(p => ({ ...p, area: e.target.value }))}
                   placeholder="e.g. North wall, Behind washer"
-                  className="w-full px-2 py-1.5 bg-slate-700/50 border border-slate-600/50 rounded-lg text-sm text-white outline-none focus:ring-1 focus:ring-cyan-500 placeholder-slate-500"
+                  className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-sm text-white outline-none focus:ring-1 focus:ring-cyan-500 placeholder-slate-500"
                 />
               </div>
               <div>
@@ -414,7 +509,7 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
                   value={tagForm.notes}
                   onChange={e => setTagForm(p => ({ ...p, notes: e.target.value }))}
                   placeholder="Visible mold, saturation level…"
-                  className="w-full px-2 py-1.5 bg-slate-700/50 border border-slate-600/50 rounded-lg text-sm text-white outline-none focus:ring-1 focus:ring-cyan-500 placeholder-slate-500"
+                  className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-sm text-white outline-none focus:ring-1 focus:ring-cyan-500 placeholder-slate-500"
                 />
               </div>
             </div>
@@ -427,10 +522,9 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
         )}
       </div>
 
-      {/* ─── Upload Button ───────────────────────────────────────── */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* All filter */}
+      {/* ─── Filter bar + view toggle ────────────────────────────── */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <button
             onClick={() => setFilter('all')}
             className={`text-xs px-3 py-1.5 rounded-full border font-medium transition ${
@@ -456,63 +550,51 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
           ))}
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* View mode toggle */}
-          <button
-            onClick={() => setViewMode(v => v === 'grid' ? 'room' : 'grid')}
-            className="flex items-center gap-1.5 text-xs px-3 py-2 bg-slate-700/50 hover:bg-slate-700 border border-slate-600/40 rounded-xl text-slate-400 hover:text-white transition"
-          >
-            <Layers className="w-3.5 h-3.5" />
-            {viewMode === 'grid' ? 'By Room' : 'Grid'}
-          </button>
-
-          {/* Upload */}
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-600 text-slate-900 disabled:text-slate-400 text-sm font-bold px-4 py-2 rounded-xl transition shadow-lg shadow-cyan-500/20"
-          >
-            {uploading
-              ? <><Loader2 className="w-4 h-4 animate-spin" /> {uploadProgress}%</>
-              : <><Camera className="w-4 h-4" /> Add Photos</>
-            }
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={sourceInfo(tagForm.photo_source)?.accept || 'image/*'}
-            multiple
-            className="hidden"
-            onChange={handleUpload}
-          />
-        </div>
+        <button
+          onClick={() => setViewMode(v => v === 'grid' ? 'room' : 'grid')}
+          className="flex items-center gap-1.5 text-xs px-3 py-2 bg-slate-700/50 hover:bg-slate-700 border border-slate-600/40 rounded-xl text-slate-400 hover:text-white transition"
+        >
+          <Layers className="w-3.5 h-3.5" />
+          {viewMode === 'grid' ? 'By Room' : 'Grid'}
+        </button>
       </div>
 
       {/* ─── Alerts ──────────────────────────────────────────────── */}
-      {error   && <div className="bg-red-900/30 border border-red-700/40 text-red-300 text-sm rounded-xl p-3 flex items-center gap-2"><AlertTriangle className="w-4 h-4 shrink-0" />{error}</div>}
-      {success && <div className="bg-emerald-900/30 border border-emerald-700/40 text-emerald-300 text-sm rounded-xl p-3 flex items-center gap-2"><CheckCircle2 className="w-4 h-4 shrink-0" />{success}</div>}
+      {error   && (
+        <div className="bg-red-900/30 border border-red-700/40 text-red-300 text-sm rounded-xl p-3 flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span className="flex-1">{error}</span>
+          <button onClick={() => setError('')}><X className="w-4 h-4" /></button>
+        </div>
+      )}
+      {success && (
+        <div className="bg-emerald-900/30 border border-emerald-700/40 text-emerald-300 text-sm rounded-xl p-3 flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />{success}
+        </div>
+      )}
 
       {/* ─── Photo Grid / Room View ───────────────────────────────── */}
       {filteredPhotos.length === 0 ? (
-        <div className="text-center py-16 bg-slate-800/40 rounded-2xl border border-dashed border-slate-600/40">
+        <div className="text-center py-16 bg-slate-800/40 rounded-2xl border-2 border-dashed border-slate-600/40">
           <Camera className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-          <p className="text-slate-400 font-medium">No photos yet</p>
-          <p className="text-sm text-slate-500 mt-1">Click &quot;Add Photos&quot; to start documenting damage</p>
-          <p className="text-xs text-slate-500 mt-1">🔵 Insta360 X4: export as flat JPEG from the Insta360 app</p>
+          <p className="text-slate-300 font-semibold">No photos yet</p>
+          <p className="text-sm text-slate-500 mt-1">Use <strong className="text-white">Take Photo</strong> to open your camera</p>
+          <p className="text-sm text-slate-500">or <strong className="text-white">Upload Files</strong> to pick from your gallery</p>
+          <p className="text-xs text-cyan-400/60 mt-2">🔵 Insta360 X4: export as flat JPEG from the Insta360 app first</p>
         </div>
       ) : viewMode === 'grid' ? (
         <PhotoGrid
           photos={filteredPhotos}
           onOpen={openLightbox}
           onDelete={deletePhoto}
-          onAdd={() => fileInputRef.current?.click()}
+          onAddCamera={() => cameraInputRef.current?.click()}
+          onAddFile={() => fileInputRef.current?.click()}
         />
       ) : (
-        /* Room grouped view */
         <div className="space-y-6">
           {Object.entries(groupByRoom(filteredPhotos)).map(([room, roomPhotos]) => (
             <div key={room}>
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <span className="text-sm font-bold text-white">{room}</span>
                 <span className="text-xs text-slate-500">{roomPhotos.length} photo{roomPhotos.length !== 1 ? 's' : ''}</span>
                 <div className="flex gap-1 flex-wrap">
@@ -525,7 +607,8 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
                 photos={roomPhotos}
                 onOpen={openLightbox}
                 onDelete={deletePhoto}
-                onAdd={() => fileInputRef.current?.click()}
+                onAddCamera={() => cameraInputRef.current?.click()}
+                onAddFile={() => fileInputRef.current?.click()}
                 compact
               />
             </div>
@@ -536,36 +619,36 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
       {/* ─── Lightbox ────────────────────────────────────────────── */}
       {lightbox && (
         <div
-          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-3 sm:p-6"
           onClick={() => { setLightbox(null); setEditing(false); }}
         >
           <div className="relative w-full max-w-4xl" onClick={e => e.stopPropagation()}>
+
+            {/* Close */}
+            <button
+              onClick={() => { setLightbox(null); setEditing(false); }}
+              className="absolute -top-9 right-0 text-white/60 hover:text-white z-10"
+            >
+              <X className="w-6 h-6" />
+            </button>
 
             {/* Nav arrows */}
             {filteredPhotos.length > 1 && (
               <>
                 <button
                   onClick={() => navLightbox(-1)}
-                  className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-12 w-9 h-9 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition"
+                  className="absolute left-1 sm:-left-11 top-1/3 z-10 w-9 h-9 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition"
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </button>
                 <button
                   onClick={() => navLightbox(1)}
-                  className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-12 w-9 h-9 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition"
+                  className="absolute right-1 sm:-right-11 top-1/3 z-10 w-9 h-9 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition"
                 >
                   <ChevronRight className="w-5 h-5" />
                 </button>
               </>
             )}
-
-            {/* Close */}
-            <button
-              onClick={() => { setLightbox(null); setEditing(false); }}
-              className="absolute -top-10 right-0 text-white/60 hover:text-white"
-            >
-              <X className="w-6 h-6" />
-            </button>
 
             {/* Image */}
             <div className="relative bg-slate-900 rounded-2xl overflow-hidden">
@@ -583,37 +666,34 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
               <img
                 src={lightbox.signedUrl || lightbox.photo_url}
                 alt="Job photo"
-                className="w-full max-h-[65vh] object-contain"
+                className="w-full max-h-[55vh] object-contain"
               />
             </div>
 
             {/* Meta + edit */}
-            <div className="mt-4 bg-slate-800/80 rounded-xl p-4">
+            <div className="mt-3 bg-slate-800/90 rounded-xl p-4">
               {!editing ? (
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {lightbox.damage_tag && (
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${tagInfo(lightbox.damage_tag)?.color}`}>
-                          {tagInfo(lightbox.damage_tag)?.emoji} {tagInfo(lightbox.damage_tag)?.label}
-                        </span>
-                      )}
-                      {lightbox.damage_severity && (
-                        <span className={`text-xs font-semibold ${sevInfo(lightbox.damage_severity)?.color}`}>
-                          <span className={`inline-block w-2 h-2 rounded-full mr-1 ${sevInfo(lightbox.damage_severity)?.dot}`} />
-                          {sevInfo(lightbox.damage_severity)?.label}
-                        </span>
-                      )}
-                      {lightbox.room_tag && <span className="text-sm text-white/80 font-medium">{lightbox.room_tag}</span>}
-                      {lightbox.area && <span className="text-sm text-white/50">{lightbox.area}</span>}
-                    </div>
-                    {lightbox.notes && (
-                      <p className="text-sm text-slate-400 leading-relaxed">&ldquo;{lightbox.notes}&rdquo;</p>
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {lightbox.damage_tag && (
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${tagInfo(lightbox.damage_tag)?.color}`}>
+                        {tagInfo(lightbox.damage_tag)?.emoji} {tagInfo(lightbox.damage_tag)?.label}
+                      </span>
                     )}
-                    <p className="text-xs text-white/25">{new Date(lightbox.timestamp).toLocaleString()}</p>
+                    {lightbox.damage_severity && (
+                      <span className={`text-xs font-semibold ${sevInfo(lightbox.damage_severity)?.color}`}>
+                        <span className={`inline-block w-2 h-2 rounded-full mr-1 ${sevInfo(lightbox.damage_severity)?.dot}`} />
+                        {sevInfo(lightbox.damage_severity)?.label}
+                      </span>
+                    )}
+                    {lightbox.room_tag && <span className="text-sm text-white/80 font-medium">{lightbox.room_tag}</span>}
+                    {lightbox.area && <span className="text-sm text-white/50">{lightbox.area}</span>}
                   </div>
-
-                  <div className="flex gap-2 shrink-0">
+                  {lightbox.notes && (
+                    <p className="text-sm text-slate-400 leading-relaxed">&ldquo;{lightbox.notes}&rdquo;</p>
+                  )}
+                  <p className="text-xs text-white/25">{new Date(lightbox.timestamp).toLocaleString()}</p>
+                  <div className="flex gap-2 flex-wrap pt-1">
                     <button
                       onClick={() => openEdit(lightbox)}
                       className="flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 bg-cyan-500/10 hover:bg-cyan-500/20 px-3 py-1.5 rounded-lg transition"
@@ -636,9 +716,8 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
                   </div>
                 </div>
               ) : (
-                /* Edit form in lightbox */
                 <div className="space-y-3">
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-xs text-slate-400 mb-1">Room</label>
                       <select
@@ -671,7 +750,7 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
                       </select>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs text-slate-400 mb-1">Area / Location</label>
                       <input
@@ -705,7 +784,6 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
               )}
             </div>
 
-            {/* Counter */}
             {filteredPhotos.length > 1 && (
               <p className="text-center text-xs text-white/30 mt-2">
                 {lbIdx + 1} / {filteredPhotos.length}
@@ -720,12 +798,13 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
 
 // ─── Sub-component: Photo Grid ────────────────────────────────────────────────
 function PhotoGrid({
-  photos, onOpen, onDelete, onAdd, compact = false,
+  photos, onOpen, onDelete, onAddCamera, onAddFile, compact = false,
 }: {
   photos: Photo[];
   onOpen: (p: Photo) => void;
   onDelete: (p: Photo) => void;
-  onAdd: () => void;
+  onAddCamera: () => void;
+  onAddFile: () => void;
   compact?: boolean;
 }) {
   const cols = compact
@@ -737,12 +816,21 @@ function PhotoGrid({
       {photos.map(photo => (
         <PhotoCard key={photo.id} photo={photo} onOpen={onOpen} onDelete={onDelete} />
       ))}
+      {/* Camera add tile */}
       <button
-        onClick={onAdd}
-        className={`${compact ? '' : 'aspect-square'} flex flex-col items-center justify-center bg-slate-800/40 border-2 border-dashed border-slate-600/40 rounded-xl hover:border-cyan-500/60 hover:bg-cyan-500/5 transition group min-h-[80px]`}
+        onClick={onAddCamera}
+        className={`${compact ? '' : 'aspect-square'} flex flex-col items-center justify-center bg-cyan-500/5 border-2 border-dashed border-cyan-500/30 rounded-xl hover:border-cyan-500/60 hover:bg-cyan-500/10 transition group min-h-[70px]`}
       >
-        <Plus className="w-6 h-6 text-slate-600 group-hover:text-cyan-400 transition" />
-        <span className="text-[10px] text-slate-500 group-hover:text-cyan-400 mt-1">Add</span>
+        <Camera className="w-5 h-5 text-cyan-600 group-hover:text-cyan-400 transition" />
+        <span className="text-[9px] text-slate-500 group-hover:text-cyan-400 mt-1">Camera</span>
+      </button>
+      {/* File add tile */}
+      <button
+        onClick={onAddFile}
+        className={`${compact ? '' : 'aspect-square'} flex flex-col items-center justify-center bg-slate-800/40 border-2 border-dashed border-slate-600/40 rounded-xl hover:border-slate-500/60 hover:bg-slate-700/40 transition group min-h-[70px]`}
+      >
+        <FolderOpen className="w-5 h-5 text-slate-600 group-hover:text-slate-300 transition" />
+        <span className="text-[9px] text-slate-500 group-hover:text-slate-300 mt-1">Files</span>
       </button>
     </div>
   );
@@ -763,8 +851,9 @@ function PhotoCard({
   return (
     <div className="group relative bg-slate-800 rounded-xl overflow-hidden border border-slate-700/50 hover:border-cyan-500/40 transition aspect-square">
       {imgErr ? (
-        <div className="w-full h-full flex items-center justify-center bg-slate-800">
-          <ImageOff className="w-6 h-6 text-slate-600" />
+        <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800 gap-1">
+          <ImageOff className="w-5 h-5 text-slate-600" />
+          <span className="text-[9px] text-slate-600">Load error</span>
         </div>
       ) : (
         <img
@@ -778,14 +867,13 @@ function PhotoCard({
 
       {/* 360 badge */}
       {photo.is_360 && (
-        <div className="absolute top-1 right-8 z-10">
+        <div className="absolute top-1 right-7 z-10">
           <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-cyan-500/80 text-slate-900">360°</span>
         </div>
       )}
-
-      {/* Insta360 source badge */}
+      {/* Insta360 badge */}
       {photo.photo_source === 'insta360' && !photo.is_360 && (
-        <div className="absolute top-1 right-8 z-10">
+        <div className="absolute top-1 right-7 z-10">
           <span className="text-[8px] px-1 py-0.5 rounded bg-slate-900/70 text-cyan-400 font-bold">X4</span>
         </div>
       )}
@@ -795,7 +883,7 @@ function PhotoCard({
         <div className={`absolute top-1.5 left-1.5 w-2 h-2 rounded-full ${sev.dot} shadow ring-1 ring-black/40`} />
       )}
 
-      {/* Damage tag badge */}
+      {/* Damage tag */}
       {tag && (
         <div className="absolute bottom-1 left-1">
           <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${tag.color}`}>
@@ -807,7 +895,7 @@ function PhotoCard({
       {/* Room tag */}
       {photo.room_tag && (
         <div className="absolute bottom-1 right-1">
-          <span className="text-[8px] px-1 py-0.5 rounded bg-slate-900/80 text-slate-300 backdrop-blur-sm truncate max-w-[60px] block">
+          <span className="text-[8px] px-1 py-0.5 rounded bg-slate-900/80 text-slate-300 backdrop-blur-sm truncate max-w-[55px] block">
             {photo.room_tag}
           </span>
         </div>
