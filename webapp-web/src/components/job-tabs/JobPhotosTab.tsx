@@ -100,11 +100,28 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
 
     if (data) {
       const withUrls = await Promise.all(data.map(async (p) => {
-        if (p.photo_url?.startsWith('http')) return { ...p, signedUrl: p.photo_url };
+        // If already a full http URL stored (old records), use signed URL from path
+        const rawUrl: string = p.photo_url || '';
+        // Extract storage path from full URL if needed
+        let storagePath = rawUrl;
+        if (rawUrl.startsWith('http')) {
+          // Try to extract path from publicUrl format
+          const match = rawUrl.match(/\/job-photos\/(.+?)(\?|$)/);
+          if (match) {
+            storagePath = decodeURIComponent(match[1]);
+          } else {
+            // Can't extract path, use URL directly
+            return { ...p, signedUrl: rawUrl };
+          }
+        }
         try {
-          const { data: signed } = await supabase.storage.from('job-photos').createSignedUrl(p.photo_url, 3600);
-          return { ...p, signedUrl: signed?.signedUrl || p.photo_url };
-        } catch { return { ...p, signedUrl: p.photo_url }; }
+          const { data: signed } = await supabase.storage
+            .from('job-photos')
+            .createSignedUrl(storagePath, 3600);
+          return { ...p, signedUrl: signed?.signedUrl || rawUrl };
+        } catch {
+          return { ...p, signedUrl: rawUrl };
+        }
       }));
       setPhotos(withUrls);
     }
@@ -141,12 +158,10 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
         continue;
       }
 
-      // Build public URL
-      const { data: { publicUrl } } = supabase.storage.from('job-photos').getPublicUrl(path);
-
+      // Store the storage path (not public URL) — bucket is private, use signed URLs
       const { data: record, error: dbErr } = await supabase.from('job_photos').insert({
         job_id:          jobId,
-        photo_url:       publicUrl,
+        photo_url:       path,   // store path, not public URL
         room_tag:        tagForm.room_tag        || null,
         damage_tag:      tagForm.damage_tag       || null,
         area:            tagForm.area             || null,
@@ -163,8 +178,15 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
         continue;
       }
 
+      // Generate signed URL for immediate display
+      let signedUrl = '';
+      try {
+        const { data: signed } = await supabase.storage.from('job-photos').createSignedUrl(path, 3600);
+        signedUrl = signed?.signedUrl || '';
+      } catch { signedUrl = ''; }
+
       if (record) {
-        setPhotos(prev => [{ ...record, signedUrl: publicUrl }, ...prev]);
+        setPhotos(prev => [{ ...record, signedUrl }, ...prev]);
         successCount++;
       }
 
