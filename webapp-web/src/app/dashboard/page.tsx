@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { useCompanyContext } from '@/hooks/useCompanyContext';
 import {
   Briefcase, Clock, CheckCircle, AlertTriangle, Plus,
   TrendingUp, Users, MapPin, ChevronRight, Zap,
@@ -52,12 +53,16 @@ function getGreeting() {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { ownerUserId, loading: ctxLoading } = useCompanyContext();
   const [stats, setStats]       = useState<DashboardStats>({ total: 0, active: 0, review: 0, closed: 0 });
   const [recentJobs, setRecentJobs] = useState<RecentJob[]>([]);
   const [loading, setLoading]   = useState(true);
   const [userName, setUserName] = useState('');
 
   useEffect(() => {
+    // Wait until company context has resolved ownerUserId
+    if (ctxLoading || !ownerUserId) return;
+
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { router.push('/login'); return; }
@@ -70,7 +75,7 @@ export default function DashboardPage() {
       const { data: jobs } = await supabase
         .from('jobs')
         .select('id, insured_name, property_address, status, current_step, job_type, created_at')
-        .eq('user_id', session.user.id)
+        .eq('user_id', ownerUserId)   // ← always the company_admin's id
         .order('created_at', { ascending: false });
 
       if (jobs) {
@@ -85,9 +90,9 @@ export default function DashboardPage() {
       setLoading(false);
     };
     init();
-  }, [router]);
+  }, [router, ownerUserId, ctxLoading]);
 
-  if (loading) {
+  if (loading || ctxLoading) {
     return (
       <div className="flex items-center justify-center h-full min-h-screen bg-[#0a0f1e]">
         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-cyan-500" />

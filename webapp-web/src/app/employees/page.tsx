@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useCompanyContext } from '@/hooks/useCompanyContext';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import Sidebar from '@/components/Sidebar';
@@ -52,6 +53,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export default function EmployeesPage() {
   const router = useRouter();
   const { can } = usePermissions();
+  const { ownerUserId, selfUserId, companyName: ctxCompanyName, loading: ctxLoading } = useCompanyContext();
   const canManage = can('add_employees');
 
   const [userId,      setUserId]      = useState('');
@@ -77,17 +79,24 @@ export default function EmployeesPage() {
 
   // load
   useEffect(() => {
+    if (ctxLoading || !ownerUserId) return;
+
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { router.push('/login'); return; }
-      setUserId(session.user.id);
-      const { data: u } = await supabase.from('users').select('company_name').eq('id', session.user.id).single();
-      if (u?.company_name) setCompany(u.company_name);
-      await load(session.user.id);
+
+      // selfUserId for display purposes (the logged-in user's own id)
+      setUserId(selfUserId || session.user.id);
+
+      // Use company name from context (resolved correctly for both roles)
+      setCompany(ctxCompanyName || 'RoomLens Pro');
+
+      // Always load team_members using the owner's user_id
+      await load(ownerUserId);
       setLoading(false);
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [ctxLoading, ownerUserId]);
 
   async function load(uid: string) {
     const { data } = await supabase
@@ -125,7 +134,7 @@ export default function EmployeesPage() {
           email: form.email || null, notes: form.notes || null,
         }).eq('id', editId);
         if (error) { setFormErr(error.message); return; }
-        setFormOk('Member updated.'); setShowForm(false); load(userId);
+        setFormOk('Member updated.'); setShowForm(false); load(ownerUserId);
       } else {
         // Send everything to the API route — it handles users upsert +
         // team_members insert + auth user creation with service role key
@@ -140,13 +149,13 @@ export default function EmployeesPage() {
             notes: form.notes || null,
             temp_password: form.temp_password,
             company_name: company,
-            admin_user_id: userId,
+            admin_user_id: ownerUserId,  // ← always the company_admin's id
           }),
         });
         const r = await res.json();
         if (r.success) {
           setInvite({ url: r.invite_url, sms: r.sms_message, name: form.full_name, phone: form.cell_phone||'', smsSent: r.sms_sent||false });
-          setShowForm(false); load(userId);
+          setShowForm(false); load(ownerUserId);
         } else { setFormErr(r.error || 'Invite failed.'); }
       }
     } catch (err: unknown) {
@@ -156,13 +165,13 @@ export default function EmployeesPage() {
 
   async function toggle(m: TeamMember) {
     await supabase.from('team_members').update({ is_active: !m.is_active }).eq('id', m.id);
-    load(userId);
+    load(ownerUserId);
   }
 
   async function remove(id: string, name: string) {
     if (!confirm(`Delete ${name}? This cannot be undone.`)) return;
     await supabase.from('team_members').delete().eq('id', id);
-    load(userId);
+    load(ownerUserId);
   }
 
   // derived
@@ -404,7 +413,7 @@ export default function EmployeesPage() {
           </div>
 
           {/* List */}
-          {loading ? (
+          {loading || ctxLoading ? (
             <div className="space-y-3">
               {[1,2,3].map(i => <div key={i} className="h-20 bg-slate-800/50 rounded-xl animate-pulse" />)}
             </div>

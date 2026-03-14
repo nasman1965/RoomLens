@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { useCompanyContext } from '@/hooks/useCompanyContext';
 import { Plus, Search, Filter, Briefcase, MapPin, ChevronRight } from 'lucide-react';
 
 interface Job {
@@ -48,6 +49,7 @@ const STATUS_FILTERS = [
 
 export default function JobsPage() {
   const router = useRouter();
+  const { ownerUserId, loading: ctxLoading } = useCompanyContext();
   const [jobs, setJobs]           = useState<Job[]>([]);
   const [filtered, setFiltered]   = useState<Job[]>([]);
   const [loading, setLoading]     = useState(true);
@@ -55,6 +57,9 @@ export default function JobsPage() {
   const [statusFilter, setFilter] = useState('all');
 
   useEffect(() => {
+    // Wait until company context has resolved the correct ownerUserId
+    if (ctxLoading || !ownerUserId) return;
+
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { router.push('/login'); return; }
@@ -62,7 +67,7 @@ export default function JobsPage() {
       const { data } = await supabase
         .from('jobs')
         .select('id, insured_name, property_address, property_city, claim_number, insurer_name, status, current_step, job_type, created_at')
-        .eq('user_id', session.user.id)
+        .eq('user_id', ownerUserId)   // ← always the company_admin's id
         .order('created_at', { ascending: false });
 
       setJobs(data || []);
@@ -70,7 +75,7 @@ export default function JobsPage() {
       setLoading(false);
     };
     init();
-  }, [router]);
+  }, [router, ownerUserId, ctxLoading]);
 
   useEffect(() => {
     let result = jobs;
@@ -87,7 +92,7 @@ export default function JobsPage() {
     setFiltered(result);
   }, [search, statusFilter, jobs]);
 
-  if (loading) {
+  if (loading || ctxLoading) {
     return (
       <div className="flex items-center justify-center h-full min-h-screen bg-[#0a0f1e]">
         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-cyan-500" />
