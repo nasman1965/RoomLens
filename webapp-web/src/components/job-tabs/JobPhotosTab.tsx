@@ -5,7 +5,7 @@ import {
   Camera, X, ZoomIn, Trash2, Loader2, Plus, Tag, Info,
   ChevronDown, ChevronLeft, ChevronRight,
   AlertTriangle, CheckCircle2, Layers, ImageOff, Maximize2,
-  FolderOpen, Aperture,
+  FolderOpen, Aperture, Home, MoveRight, AlertCircle,
 } from 'lucide-react';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -47,6 +47,20 @@ const ROOM_TAGS = [
   'Attic','Exterior','Roof','Other',
 ];
 
+// ─── CSS animation for shake ─────────────────────────────────────────────────
+const SHAKE_CSS = `
+@keyframes roomShake {
+  0%,100%{transform:translateX(0)}
+  15%{transform:translateX(-6px)}
+  30%{transform:translateX(6px)}
+  45%{transform:translateX(-5px)}
+  60%{transform:translateX(5px)}
+  75%{transform:translateX(-3px)}
+  90%{transform:translateX(3px)}
+}
+.shake-anim { animation: roomShake 0.55s ease; }
+`;
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const tagInfo = (val: string) => DAMAGE_TAGS.find(t => t.value === val);
 const sevInfo = (val: string) => SEVERITY_LEVELS.find(s => s.value === val);
@@ -61,11 +75,136 @@ function groupByRoom(photos: Photo[]) {
   return map;
 }
 
+// ─── Move to Room Modal ───────────────────────────────────────────────────────
+function MoveToRoomModal({
+  photo,
+  onClose,
+  onSave,
+}: {
+  photo: Photo;
+  onClose: () => void;
+  onSave: (room: string) => Promise<void>;
+}) {
+  const [selected, setSelected] = useState(photo.room_tag || '');
+  const [customRoom, setCustomRoom] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    const room = selected === '__custom__' ? customRoom.trim() : selected;
+    if (!room) return;
+    setSaving(true);
+    await onSave(room);
+    setSaving(false);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] bg-black/80 flex items-end sm:items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm bg-slate-800 border border-slate-600/60 rounded-2xl overflow-hidden shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/50 bg-slate-800/80">
+          <div className="flex items-center gap-2">
+            <Home className="w-4 h-4 text-cyan-400" />
+            <span className="text-sm font-bold text-white">Assign to Room</span>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-white">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Photo preview */}
+        <div className="px-4 pt-3 pb-2">
+          <div className="flex items-center gap-3 bg-slate-700/40 rounded-xl p-2.5">
+            <img
+              src={photo.signedUrl || photo.photo_url}
+              alt=""
+              className="w-12 h-12 object-cover rounded-lg"
+            />
+            <div className="min-w-0">
+              <p className="text-xs text-white font-medium truncate">
+                {photo.room_tag ? `Currently: ${photo.room_tag}` : 'No room assigned'}
+              </p>
+              <p className="text-[10px] text-slate-400">{new Date(photo.timestamp).toLocaleDateString()}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Room grid */}
+        <div className="px-4 pb-2 max-h-64 overflow-y-auto">
+          <div className="grid grid-cols-2 gap-1.5">
+            {ROOM_TAGS.map(room => (
+              <button
+                key={room}
+                type="button"
+                onClick={() => setSelected(room)}
+                className={`text-left text-xs px-3 py-2 rounded-xl border transition font-medium truncate ${
+                  selected === room
+                    ? 'bg-cyan-500/20 border-cyan-500/60 text-cyan-300 ring-1 ring-cyan-500/40'
+                    : 'bg-slate-700/30 border-slate-600/40 text-slate-300 hover:border-slate-500/60 hover:text-white'
+                }`}
+              >
+                {room}
+              </button>
+            ))}
+            {/* Custom room option */}
+            <button
+              type="button"
+              onClick={() => setSelected('__custom__')}
+              className={`text-left text-xs px-3 py-2 rounded-xl border transition font-medium col-span-2 ${
+                selected === '__custom__'
+                  ? 'bg-cyan-500/20 border-cyan-500/60 text-cyan-300 ring-1 ring-cyan-500/40'
+                  : 'bg-slate-700/30 border-slate-600/40 text-slate-400 hover:border-slate-500/60 hover:text-white'
+              }`}
+            >
+              ✏️ Custom room name…
+            </button>
+          </div>
+
+          {/* Custom input */}
+          {selected === '__custom__' && (
+            <input
+              type="text"
+              value={customRoom}
+              onChange={e => setCustomRoom(e.target.value)}
+              autoFocus
+              placeholder="e.g. Master Closet, Mud Room…"
+              className="mt-2 w-full px-3 py-2 bg-slate-700 border border-cyan-500/40 rounded-xl text-sm text-white outline-none focus:ring-1 focus:ring-cyan-500 placeholder-slate-500"
+            />
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex gap-2 px-4 pb-4 pt-2">
+          <button
+            onClick={handleSave}
+            disabled={saving || (!selected || (selected === '__custom__' && !customRoom.trim()))}
+            className="flex-1 flex items-center justify-center gap-1.5 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-900 font-bold text-sm px-4 py-2 rounded-xl transition"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <MoveRight className="w-4 h-4" />}
+            {saving ? 'Saving…' : 'Assign Room'}
+          </button>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-slate-400 hover:text-white border border-slate-600 rounded-xl transition"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId: string }) {
-  // Two separate file inputs: one for camera capture, one for library/files
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef   = useRef<HTMLInputElement>(null);
+  const roomSelectRef  = useRef<HTMLDivElement>(null);   // ref for shake target
 
   const [photos,          setPhotos]          = useState<Photo[]>([]);
   const [loading,         setLoading]         = useState(true);
@@ -78,12 +217,14 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
   const [error,           setError]           = useState('');
   const [success,         setSuccess]         = useState('');
   const [showTagForm,     setShowTagForm]      = useState(true);
+  const [roomWarning,     setRoomWarning]      = useState(false);  // guardrail warning
+  const [movePhoto,       setMovePhoto]        = useState<Photo | null>(null); // room-reassign modal
 
   const [tagForm, setTagForm] = useState({
     room_tag:        '',
     damage_tag:      'water_damage',
     area:            '',
-    photo_source:    'standard',  // 'standard' | 'insta360'
+    photo_source:    'standard',
     is_360:          false,
     notes:           '',
     damage_severity: 'medium',
@@ -100,17 +241,13 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
 
     if (data) {
       const withUrls = await Promise.all(data.map(async (p) => {
-        // If already a full http URL stored (old records), use signed URL from path
         const rawUrl: string = p.photo_url || '';
-        // Extract storage path from full URL if needed
         let storagePath = rawUrl;
         if (rawUrl.startsWith('http')) {
-          // Try to extract path from publicUrl format
           const match = rawUrl.match(/\/job-photos\/(.+?)(\?|$)/);
           if (match) {
             storagePath = decodeURIComponent(match[1]);
           } else {
-            // Can't extract path, use URL directly
             return { ...p, signedUrl: rawUrl };
           }
         }
@@ -130,16 +267,48 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
 
   useEffect(() => { load(); }, [load]);
 
+  // ─── Room Guardrail ───────────────────────────────────────────────────────
+  // Called before any upload attempt; returns true if upload may proceed
+  const checkRoomSelected = (): boolean => {
+    if (tagForm.room_tag) return true;
+
+    // Show warning state + shake animation
+    setRoomWarning(true);
+    setShowTagForm(true); // expand tag form so user can see it
+    setError('⚠️ Please choose a room before uploading photos.');
+
+    // Shake the room select section
+    if (roomSelectRef.current) {
+      roomSelectRef.current.classList.remove('shake-anim');
+      // Trigger reflow so the animation restarts
+      void roomSelectRef.current.offsetWidth;
+      roomSelectRef.current.classList.add('shake-anim');
+      setTimeout(() => roomSelectRef.current?.classList.remove('shake-anim'), 600);
+    }
+
+    // Scroll to the tag form on mobile
+    roomSelectRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    // Auto-clear warning after 4 s
+    setTimeout(() => {
+      setRoomWarning(false);
+      setError('');
+    }, 4000);
+
+    return false;
+  };
+
   // ─── Core upload logic ────────────────────────────────────────────────────
   const uploadFiles = async (files: File[]) => {
     if (!files.length) return;
+    if (!checkRoomSelected()) return; // ← GUARDRAIL
+
     setUploading(true); setError(''); setUploadProgress(0);
 
     let successCount = 0;
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
 
-      // Validate file type
       if (!file.type.startsWith('image/')) {
         setError(`Skipped "${file.name}" — not an image file.`);
         continue;
@@ -158,10 +327,9 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
         continue;
       }
 
-      // Store the storage path (not public URL) — bucket is private, use signed URLs
       const { data: record, error: dbErr } = await supabase.from('job_photos').insert({
         job_id:          jobId,
-        photo_url:       path,   // store path, not public URL
+        photo_url:       path,
         room_tag:        tagForm.room_tag        || null,
         damage_tag:      tagForm.damage_tag       || null,
         area:            tagForm.area             || null,
@@ -178,7 +346,6 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
         continue;
       }
 
-      // Generate signed URL for immediate display
       let signedUrl = '';
       try {
         const { data: signed } = await supabase.storage.from('job-photos').createSignedUrl(path, 3600);
@@ -198,13 +365,23 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
       setSuccess(`${successCount} photo${successCount > 1 ? 's' : ''} uploaded ✅`);
       setTimeout(() => setSuccess(''), 4000);
     }
-    // Reset both inputs
     if (cameraInputRef.current) cameraInputRef.current.value = '';
     if (fileInputRef.current)   fileInputRef.current.value   = '';
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     uploadFiles(Array.from(e.target.files || []));
+  };
+
+  // Intercept button clicks — check room before opening file dialog
+  const handleTakePhoto = () => {
+    if (!checkRoomSelected()) return;
+    cameraInputRef.current?.click();
+  };
+
+  const handleUploadFiles = () => {
+    if (!checkRoomSelected()) return;
+    fileInputRef.current?.click();
   };
 
   // ─── Delete ───────────────────────────────────────────────────────────────
@@ -215,6 +392,18 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
     await supabase.from('job_photos').delete().eq('id', photo.id);
     setPhotos(prev => prev.filter(p => p.id !== photo.id));
     if (lightbox?.id === photo.id) setLightbox(null);
+  };
+
+  // ─── Reassign room ─────────────────────────────────────────────────────────
+  const reassignRoom = async (photo: Photo, room: string) => {
+    const { error } = await supabase.from('job_photos').update({ room_tag: room }).eq('id', photo.id);
+    if (!error) {
+      setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, room_tag: room } : p));
+      if (lightbox?.id === photo.id) setLightbox(prev => prev ? { ...prev, room_tag: room } : prev);
+      setSuccess(`Photo moved to ${room} ✅`);
+      setTimeout(() => setSuccess(''), 3000);
+    }
+    setMovePhoto(null);
   };
 
   // ─── Lightbox edit/save ────────────────────────────────────────────────────
@@ -248,7 +437,11 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
   };
 
   // ─── Lightbox navigation ──────────────────────────────────────────────────
-  const filteredPhotos = filter === 'all' ? photos : photos.filter(p => p.damage_tag === filter);
+  const filteredPhotos = (() => {
+    if (filter === 'all') return photos;
+    if (filter === 'no_room') return photos.filter(p => !p.room_tag);
+    return photos.filter(p => p.damage_tag === filter);
+  })();
 
   const openLightbox = (photo: Photo) => {
     const idx = filteredPhotos.findIndex(p => p.id === photo.id);
@@ -270,8 +463,9 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
     count: photos.filter(p => p.damage_tag === t.value).length,
   })).filter(t => t.count > 0);
 
-  const i360Count  = photos.filter(p => p.photo_source === 'insta360').length;
-  const roomGroups = groupByRoom(photos);
+  const i360Count    = photos.filter(p => p.photo_source === 'insta360').length;
+  const noRoomCount  = photos.filter(p => !p.room_tag).length;
+  const roomGroups   = groupByRoom(photos);
 
   // ─── Render ───────────────────────────────────────────────────────────────
   if (loading) return (
@@ -282,6 +476,26 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
 
   return (
     <div className="space-y-4">
+      {/* Inject shake keyframes */}
+      <style>{SHAKE_CSS}</style>
+
+      {/* ─── Untagged Room Banner ────────────────────────────────── */}
+      {noRoomCount > 0 && (
+        <div className="flex items-center justify-between gap-3 bg-amber-900/30 border border-amber-600/40 rounded-xl px-4 py-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+            <p className="text-xs text-amber-300 font-medium">
+              <span className="font-bold text-amber-200">{noRoomCount} photo{noRoomCount !== 1 ? 's' : ''}</span> still need a room assigned
+            </p>
+          </div>
+          <button
+            onClick={() => setFilter('no_room')}
+            className="shrink-0 text-xs bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 font-semibold px-3 py-1.5 rounded-lg transition"
+          >
+            View &amp; Fix
+          </button>
+        </div>
+      )}
 
       {/* ─── Stats Bar ─────────────────────────────────────────── */}
       {photos.length > 0 && (
@@ -301,36 +515,43 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
             <div className="text-xs text-slate-400 mt-0.5">High/Critical</div>
           </div>
           <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-3 text-center">
-            <div className="text-2xl font-bold text-emerald-400">{Object.keys(roomGroups).length}</div>
+            <div className="text-2xl font-bold text-emerald-400">{Object.keys(roomGroups).filter(k => k !== '—').length}</div>
             <div className="text-xs text-slate-400 mt-0.5">Rooms Tagged</div>
           </div>
         </div>
       )}
 
-      {/* ─── Upload Section (Camera vs Files) ───────────────────── */}
+      {/* ─── Upload Section ─────────────────────────────────────── */}
       <div className="bg-slate-800/60 border border-slate-600/40 rounded-2xl overflow-hidden">
-
-        {/* Header */}
         <div className="px-4 pt-4 pb-2">
           <h3 className="text-sm font-bold text-white flex items-center gap-2">
             <Camera className="w-4 h-4 text-cyan-400" />
             Add Photos
           </h3>
-          <p className="text-xs text-slate-400 mt-0.5">Choose how you want to add photos to this job</p>
+          <p className="text-xs text-slate-400 mt-0.5">
+            {tagForm.room_tag
+              ? <>Adding to <span className="text-cyan-300 font-semibold">{tagForm.room_tag}</span> — change room in Photo Tags below</>
+              : <span className="text-amber-400 font-medium">⚠️ Select a room in Photo Tags before uploading</span>
+            }
+          </p>
         </div>
 
         {/* Two big upload buttons */}
         <div className="grid grid-cols-2 gap-3 px-4 pb-4">
-
-          {/* Take Photo — opens camera directly */}
           <button
             type="button"
-            onClick={() => cameraInputRef.current?.click()}
+            onClick={handleTakePhoto}
             disabled={uploading}
-            className="flex flex-col items-center justify-center gap-2 bg-cyan-500/10 hover:bg-cyan-500/20 border-2 border-cyan-500/40 hover:border-cyan-500/70 disabled:opacity-50 rounded-xl py-5 px-3 transition group"
+            className={`flex flex-col items-center justify-center gap-2 border-2 disabled:opacity-50 rounded-xl py-5 px-3 transition group ${
+              tagForm.room_tag
+                ? 'bg-cyan-500/10 hover:bg-cyan-500/20 border-cyan-500/40 hover:border-cyan-500/70'
+                : 'bg-amber-500/5 border-amber-500/30 hover:border-amber-500/60 hover:bg-amber-500/10'
+            }`}
           >
-            <div className="w-10 h-10 rounded-full bg-cyan-500/20 flex items-center justify-center group-hover:bg-cyan-500/30 transition">
-              <Camera className="w-5 h-5 text-cyan-400" />
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center transition ${
+              tagForm.room_tag ? 'bg-cyan-500/20 group-hover:bg-cyan-500/30' : 'bg-amber-500/15 group-hover:bg-amber-500/25'
+            }`}>
+              <Camera className={`w-5 h-5 ${tagForm.room_tag ? 'text-cyan-400' : 'text-amber-400'}`} />
             </div>
             <div className="text-center">
               <div className="text-sm font-bold text-white">Take Photo</div>
@@ -338,15 +559,20 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
             </div>
           </button>
 
-          {/* Upload from Files — opens file library */}
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={handleUploadFiles}
             disabled={uploading}
-            className="flex flex-col items-center justify-center gap-2 bg-slate-700/40 hover:bg-slate-700/70 border-2 border-slate-600/40 hover:border-slate-500/70 disabled:opacity-50 rounded-xl py-5 px-3 transition group"
+            className={`flex flex-col items-center justify-center gap-2 border-2 disabled:opacity-50 rounded-xl py-5 px-3 transition group ${
+              tagForm.room_tag
+                ? 'bg-slate-700/40 hover:bg-slate-700/70 border-slate-600/40 hover:border-slate-500/70'
+                : 'bg-amber-500/5 border-amber-500/30 hover:border-amber-500/60 hover:bg-amber-500/10'
+            }`}
           >
-            <div className="w-10 h-10 rounded-full bg-slate-600/40 flex items-center justify-center group-hover:bg-slate-600/60 transition">
-              <FolderOpen className="w-5 h-5 text-slate-300" />
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center transition ${
+              tagForm.room_tag ? 'bg-slate-600/40 group-hover:bg-slate-600/60' : 'bg-amber-500/15 group-hover:bg-amber-500/25'
+            }`}>
+              <FolderOpen className={`w-5 h-5 ${tagForm.room_tag ? 'text-slate-300' : 'text-amber-400'}`} />
             </div>
             <div className="text-center">
               <div className="text-sm font-bold text-white">Upload Files</div>
@@ -376,30 +602,18 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
           </div>
         )}
 
-        {/* Hidden file inputs — CRITICAL: no capture on file input, capture=environment on camera */}
-        {/* Camera input: opens device camera directly */}
-        <input
-          ref={cameraInputRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          multiple
-          className="hidden"
-          onChange={handleFileChange}
-        />
-        {/* File input: opens file picker / gallery — NO capture attribute */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/jpeg,image/jpg,image/png,image/webp,image/heic,image/heif"
-          multiple
-          className="hidden"
-          onChange={handleFileChange}
-        />
+        {/* Hidden inputs */}
+        <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={handleFileChange} />
+        <input ref={fileInputRef}   type="file" accept="image/jpeg,image/jpg,image/png,image/webp,image/heic,image/heif" multiple className="hidden" onChange={handleFileChange} />
       </div>
 
       {/* ─── Tag Form (collapsible) ────────────────────────────── */}
-      <div className="bg-slate-800/60 border border-slate-600/40 rounded-xl overflow-hidden">
+      <div
+        ref={roomSelectRef}
+        className={`bg-slate-800/60 border rounded-xl overflow-hidden transition-all ${
+          roomWarning ? 'border-amber-500/70 shadow-[0_0_0_2px_rgba(245,158,11,0.3)]' : 'border-slate-600/40'
+        }`}
+      >
         <button
           onClick={() => setShowTagForm(!showTagForm)}
           className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-700/40 transition"
@@ -407,8 +621,14 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
           <div className="flex items-center gap-2 flex-wrap">
             <Tag className="w-4 h-4 text-cyan-400" />
             <span className="text-sm font-semibold text-white">Photo Tags</span>
-            {tagForm.room_tag && (
-              <span className="text-xs px-2 py-0.5 bg-slate-700 text-slate-300 rounded-full">{tagForm.room_tag}</span>
+            {tagForm.room_tag ? (
+              <span className="text-xs px-2 py-0.5 bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded-full font-medium">
+                🏠 {tagForm.room_tag}
+              </span>
+            ) : (
+              <span className="text-xs px-2 py-0.5 bg-amber-500/15 text-amber-400 border border-amber-500/30 rounded-full font-medium animate-pulse">
+                ⚠️ No room selected
+              </span>
             )}
             {tagForm.damage_tag && (
               <span className={`text-xs px-2 py-0.5 rounded-full ${tagInfo(tagForm.damage_tag)?.color}`}>
@@ -458,7 +678,6 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
                 ))}
               </div>
 
-              {/* 360 toggle — only for Insta360 */}
               {tagForm.photo_source === 'insta360' && (
                 <div className="mt-3 bg-cyan-900/20 border border-cyan-700/30 rounded-xl p-3">
                   <label className="flex items-center gap-3 cursor-pointer">
@@ -477,16 +696,27 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
               )}
             </div>
 
-            {/* Room / Damage / Severity — stacked on mobile */}
+            {/* ─── ROOM (highlighted when no room selected) ───────── */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Room</label>
+                <label className={`block text-xs font-semibold uppercase tracking-wider mb-1 ${
+                  roomWarning || !tagForm.room_tag ? 'text-amber-400' : 'text-slate-400'
+                }`}>
+                  {!tagForm.room_tag ? '⚠️ Room (required)' : '🏠 Room'}
+                </label>
                 <select
                   value={tagForm.room_tag}
-                  onChange={e => setTagForm(p => ({ ...p, room_tag: e.target.value }))}
-                  className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-sm text-white outline-none focus:ring-1 focus:ring-cyan-500"
+                  onChange={e => {
+                    setTagForm(p => ({ ...p, room_tag: e.target.value }));
+                    if (e.target.value) { setRoomWarning(false); setError(''); }
+                  }}
+                  className={`w-full px-3 py-2 bg-slate-700/50 border rounded-lg text-sm text-white outline-none focus:ring-1 focus:ring-cyan-500 transition ${
+                    !tagForm.room_tag
+                      ? 'border-amber-500/50 focus:ring-amber-500'
+                      : 'border-slate-600/50 focus:ring-cyan-500'
+                  }`}
                 >
-                  <option value="">— No room —</option>
+                  <option value="">— Select room —</option>
                   {ROOM_TAGS.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
@@ -557,6 +787,18 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
           >
             All ({photos.length})
           </button>
+          {noRoomCount > 0 && (
+            <button
+              onClick={() => setFilter('no_room')}
+              className={`text-xs px-3 py-1.5 rounded-full border font-medium transition ${
+                filter === 'no_room'
+                  ? 'bg-amber-500 text-slate-900 border-amber-500'
+                  : 'bg-amber-900/20 text-amber-400 border-amber-600/40 hover:border-amber-500/60'
+              }`}
+            >
+              ⚠️ No Room ({noRoomCount})
+            </button>
+          )}
           {stats.map(t => (
             <button
               key={t.value}
@@ -582,8 +824,8 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
       </div>
 
       {/* ─── Alerts ──────────────────────────────────────────────── */}
-      {error   && (
-        <div className="bg-red-900/30 border border-red-700/40 text-red-300 text-sm rounded-xl p-3 flex items-center gap-2">
+      {error && (
+        <div className="bg-amber-900/30 border border-amber-700/40 text-amber-300 text-sm rounded-xl p-3 flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           <span className="flex-1">{error}</span>
           <button onClick={() => setError('')}><X className="w-4 h-4" /></button>
@@ -599,25 +841,36 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
       {filteredPhotos.length === 0 ? (
         <div className="text-center py-16 bg-slate-800/40 rounded-2xl border-2 border-dashed border-slate-600/40">
           <Camera className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-          <p className="text-slate-300 font-semibold">No photos yet</p>
-          <p className="text-sm text-slate-500 mt-1">Use <strong className="text-white">Take Photo</strong> to open your camera</p>
-          <p className="text-sm text-slate-500">or <strong className="text-white">Upload Files</strong> to pick from your gallery</p>
-          <p className="text-xs text-cyan-400/60 mt-2">🔵 Insta360 X4: export as flat JPEG from the Insta360 app first</p>
+          {filter === 'no_room' ? (
+            <>
+              <p className="text-slate-300 font-semibold">No untagged photos 🎉</p>
+              <p className="text-sm text-slate-500 mt-1">All photos have a room assigned</p>
+            </>
+          ) : (
+            <>
+              <p className="text-slate-300 font-semibold">No photos yet</p>
+              <p className="text-sm text-slate-500 mt-1">Select a room above, then use <strong className="text-white">Take Photo</strong> or <strong className="text-white">Upload Files</strong></p>
+              <p className="text-xs text-cyan-400/60 mt-2">🔵 Insta360 X4: export as flat JPEG from the Insta360 app first</p>
+            </>
+          )}
         </div>
       ) : viewMode === 'grid' ? (
         <PhotoGrid
           photos={filteredPhotos}
           onOpen={openLightbox}
           onDelete={deletePhoto}
-          onAddCamera={() => cameraInputRef.current?.click()}
-          onAddFile={() => fileInputRef.current?.click()}
+          onMove={setMovePhoto}
+          onAddCamera={handleTakePhoto}
+          onAddFile={handleUploadFiles}
         />
       ) : (
         <div className="space-y-6">
           {Object.entries(groupByRoom(filteredPhotos)).map(([room, roomPhotos]) => (
             <div key={room}>
               <div className="flex items-center gap-2 mb-2 flex-wrap">
-                <span className="text-sm font-bold text-white">{room}</span>
+                <span className={`text-sm font-bold ${room === '—' ? 'text-amber-400' : 'text-white'}`}>
+                  {room === '—' ? '⚠️ No room assigned' : room}
+                </span>
                 <span className="text-xs text-slate-500">{roomPhotos.length} photo{roomPhotos.length !== 1 ? 's' : ''}</span>
                 <div className="flex gap-1 flex-wrap">
                   {DAMAGE_TAGS.filter(t => roomPhotos.some(p => p.damage_tag === t.value)).map(t => (
@@ -629,8 +882,9 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
                 photos={roomPhotos}
                 onOpen={openLightbox}
                 onDelete={deletePhoto}
-                onAddCamera={() => cameraInputRef.current?.click()}
-                onAddFile={() => fileInputRef.current?.click()}
+                onMove={setMovePhoto}
+                onAddCamera={handleTakePhoto}
+                onAddFile={handleUploadFiles}
                 compact
               />
             </div>
@@ -645,8 +899,6 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
           onClick={() => { setLightbox(null); setEditing(false); }}
         >
           <div className="relative w-full max-w-4xl" onClick={e => e.stopPropagation()}>
-
-            {/* Close */}
             <button
               onClick={() => { setLightbox(null); setEditing(false); }}
               className="absolute -top-9 right-0 text-white/60 hover:text-white z-10"
@@ -654,7 +906,6 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
               <X className="w-6 h-6" />
             </button>
 
-            {/* Nav arrows */}
             {filteredPhotos.length > 1 && (
               <>
                 <button
@@ -672,7 +923,6 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
               </>
             )}
 
-            {/* Image */}
             <div className="relative bg-slate-900 rounded-2xl overflow-hidden">
               {lightbox.is_360 && (
                 <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm px-2 py-1 rounded-full">
@@ -685,6 +935,12 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
                   <span className="text-[10px] text-cyan-300 font-medium">🔵 Insta360 X4</span>
                 </div>
               )}
+              {/* No-room badge in lightbox */}
+              {!lightbox.room_tag && (
+                <div className="absolute top-3 right-3 z-10">
+                  <span className="text-[10px] bg-amber-500/80 text-slate-900 font-bold px-2 py-0.5 rounded-full">⚠️ No room</span>
+                </div>
+              )}
               <img
                 src={lightbox.signedUrl || lightbox.photo_url}
                 alt="Job photo"
@@ -692,7 +948,6 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
               />
             </div>
 
-            {/* Meta + edit */}
             <div className="mt-3 bg-slate-800/90 rounded-xl p-4">
               {!editing ? (
                 <div className="space-y-3">
@@ -708,7 +963,17 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
                         {sevInfo(lightbox.damage_severity)?.label}
                       </span>
                     )}
-                    {lightbox.room_tag && <span className="text-sm text-white/80 font-medium">{lightbox.room_tag}</span>}
+                    {lightbox.room_tag
+                      ? <span className="text-sm text-white/80 font-medium">🏠 {lightbox.room_tag}</span>
+                      : (
+                        <button
+                          onClick={() => setMovePhoto(lightbox)}
+                          className="text-xs font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 px-2 py-0.5 rounded-full transition flex items-center gap-1"
+                        >
+                          <Home className="w-3 h-3" /> Assign room
+                        </button>
+                      )
+                    }
                     {lightbox.area && <span className="text-sm text-white/50">{lightbox.area}</span>}
                   </div>
                   {lightbox.notes && (
@@ -721,6 +986,12 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
                       className="flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 bg-cyan-500/10 hover:bg-cyan-500/20 px-3 py-1.5 rounded-lg transition"
                     >
                       <Tag className="w-3 h-3" /> Edit Tags
+                    </button>
+                    <button
+                      onClick={() => setMovePhoto(lightbox)}
+                      className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 px-3 py-1.5 rounded-lg transition"
+                    >
+                      <Home className="w-3 h-3" /> {lightbox.room_tag ? 'Move Room' : 'Assign Room'}
                     </button>
                     <a
                       href={lightbox.signedUrl || lightbox.photo_url}
@@ -814,17 +1085,27 @@ export default function JobPhotosTab({ jobId, userId }: { jobId: string; userId:
           </div>
         </div>
       )}
+
+      {/* ─── Move to Room Modal ───────────────────────────────────── */}
+      {movePhoto && (
+        <MoveToRoomModal
+          photo={movePhoto}
+          onClose={() => setMovePhoto(null)}
+          onSave={(room) => reassignRoom(movePhoto, room)}
+        />
+      )}
     </div>
   );
 }
 
 // ─── Sub-component: Photo Grid ────────────────────────────────────────────────
 function PhotoGrid({
-  photos, onOpen, onDelete, onAddCamera, onAddFile, compact = false,
+  photos, onOpen, onDelete, onMove, onAddCamera, onAddFile, compact = false,
 }: {
   photos: Photo[];
   onOpen: (p: Photo) => void;
   onDelete: (p: Photo) => void;
+  onMove: (p: Photo) => void;
   onAddCamera: () => void;
   onAddFile: () => void;
   compact?: boolean;
@@ -836,9 +1117,8 @@ function PhotoGrid({
   return (
     <div className={`grid ${cols}`}>
       {photos.map(photo => (
-        <PhotoCard key={photo.id} photo={photo} onOpen={onOpen} onDelete={onDelete} />
+        <PhotoCard key={photo.id} photo={photo} onOpen={onOpen} onDelete={onDelete} onMove={onMove} />
       ))}
-      {/* Camera add tile */}
       <button
         onClick={onAddCamera}
         className={`${compact ? '' : 'aspect-square'} flex flex-col items-center justify-center bg-cyan-500/5 border-2 border-dashed border-cyan-500/30 rounded-xl hover:border-cyan-500/60 hover:bg-cyan-500/10 transition group min-h-[70px]`}
@@ -846,7 +1126,6 @@ function PhotoGrid({
         <Camera className="w-5 h-5 text-cyan-600 group-hover:text-cyan-400 transition" />
         <span className="text-[9px] text-slate-500 group-hover:text-cyan-400 mt-1">Camera</span>
       </button>
-      {/* File add tile */}
       <button
         onClick={onAddFile}
         className={`${compact ? '' : 'aspect-square'} flex flex-col items-center justify-center bg-slate-800/40 border-2 border-dashed border-slate-600/40 rounded-xl hover:border-slate-500/60 hover:bg-slate-700/40 transition group min-h-[70px]`}
@@ -860,18 +1139,23 @@ function PhotoGrid({
 
 // ─── Sub-component: Photo Card ────────────────────────────────────────────────
 function PhotoCard({
-  photo, onOpen, onDelete,
+  photo, onOpen, onDelete, onMove,
 }: {
   photo: Photo;
   onOpen: (p: Photo) => void;
   onDelete: (p: Photo) => void;
+  onMove: (p: Photo) => void;
 }) {
   const tag = tagInfo(photo.damage_tag || '');
   const sev = sevInfo(photo.damage_severity || '');
   const [imgErr, setImgErr] = useState(false);
 
   return (
-    <div className="group relative bg-slate-800 rounded-xl overflow-hidden border border-slate-700/50 hover:border-cyan-500/40 transition aspect-square">
+    <div className={`group relative bg-slate-800 rounded-xl overflow-hidden border transition aspect-square ${
+      !photo.room_tag
+        ? 'border-amber-500/30 hover:border-amber-500/60'
+        : 'border-slate-700/50 hover:border-cyan-500/40'
+    }`}>
       {imgErr ? (
         <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800 gap-1">
           <ImageOff className="w-5 h-5 text-slate-600" />
@@ -914,14 +1198,26 @@ function PhotoCard({
         </div>
       )}
 
-      {/* Room tag */}
-      {photo.room_tag && (
-        <div className="absolute bottom-1 right-1">
-          <span className="text-[8px] px-1 py-0.5 rounded bg-slate-900/80 text-slate-300 backdrop-blur-sm truncate max-w-[55px] block">
+      {/* Room tag — clickable to reassign if present, or shows "no room" warning */}
+      <div className="absolute bottom-1 right-1">
+        {photo.room_tag ? (
+          <button
+            onClick={(e) => { e.stopPropagation(); onMove(photo); }}
+            className="text-[8px] px-1 py-0.5 rounded bg-slate-900/80 text-slate-300 backdrop-blur-sm truncate max-w-[55px] block hover:bg-cyan-900/80 hover:text-cyan-300 transition"
+            title={`Move from ${photo.room_tag}`}
+          >
             {photo.room_tag}
-          </span>
-        </div>
-      )}
+          </button>
+        ) : (
+          <button
+            onClick={(e) => { e.stopPropagation(); onMove(photo); }}
+            className="text-[8px] px-1 py-0.5 rounded bg-amber-500/80 text-slate-900 font-bold hover:bg-amber-400 transition"
+            title="Assign a room"
+          >
+            + Room
+          </button>
+        )}
+      </div>
 
       {/* Hover actions */}
       <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition">
