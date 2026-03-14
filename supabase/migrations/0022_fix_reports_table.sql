@@ -51,7 +51,7 @@ CREATE POLICY "reports_select"
   USING (
     created_by = auth.uid()
     OR job_id IN (
-      SELECT id FROM public.jobs WHERE created_by = auth.uid()
+      SELECT id FROM public.jobs WHERE user_id = auth.uid()
     )
   );
 
@@ -61,7 +61,7 @@ CREATE POLICY "reports_insert"
   TO authenticated
   WITH CHECK (
     job_id IN (
-      SELECT id FROM public.jobs WHERE created_by = auth.uid()
+      SELECT id FROM public.jobs WHERE user_id = auth.uid()
     )
   );
 
@@ -72,7 +72,7 @@ CREATE POLICY "reports_delete"
   USING (
     created_by = auth.uid()
     OR job_id IN (
-      SELECT id FROM public.jobs WHERE created_by = auth.uid()
+      SELECT id FROM public.jobs WHERE user_id = auth.uid()
     )
   );
 

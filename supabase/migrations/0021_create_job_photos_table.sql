@@ -45,30 +45,15 @@ ALTER TABLE public.job_photos ENABLE ROW LEVEL SECURITY;
 -- ── 4. RLS Policies ──────────────────────────────────────────────────────────
 
 -- Allow authenticated users to SELECT photos for jobs they own
--- (job must belong to a company the user is part of, or they uploaded it)
 DROP POLICY IF EXISTS "job_photos_select" ON public.job_photos;
 CREATE POLICY "job_photos_select"
   ON public.job_photos FOR SELECT
   TO authenticated
   USING (
-    -- User uploaded the photo
     technician_id = auth.uid()
     OR
-    -- User owns the job
     job_id IN (
-      SELECT id FROM public.jobs WHERE created_by = auth.uid()
-    )
-    OR
-    -- User is a team member of the same company as the job owner
-    job_id IN (
-      SELECT j.id FROM public.jobs j
-      JOIN public.team_members tm ON tm.user_id = auth.uid()
-      JOIN public.users u ON u.id = j.created_by
-      WHERE u.company_name IS NOT NULL
-        AND EXISTS (
-          SELECT 1 FROM public.users owner
-          WHERE owner.id = j.created_by
-        )
+      SELECT id FROM public.jobs WHERE user_id = auth.uid()
     )
   );
 
@@ -81,7 +66,7 @@ CREATE POLICY "job_photos_insert"
     technician_id = auth.uid()
     OR
     job_id IN (
-      SELECT id FROM public.jobs WHERE created_by = auth.uid()
+      SELECT id FROM public.jobs WHERE user_id = auth.uid()
     )
   );
 
@@ -94,7 +79,7 @@ CREATE POLICY "job_photos_update"
     technician_id = auth.uid()
     OR
     job_id IN (
-      SELECT id FROM public.jobs WHERE created_by = auth.uid()
+      SELECT id FROM public.jobs WHERE user_id = auth.uid()
     )
   );
 
@@ -107,7 +92,7 @@ CREATE POLICY "job_photos_delete"
     technician_id = auth.uid()
     OR
     job_id IN (
-      SELECT id FROM public.jobs WHERE created_by = auth.uid()
+      SELECT id FROM public.jobs WHERE user_id = auth.uid()
     )
   );
 
