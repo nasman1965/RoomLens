@@ -9,6 +9,7 @@ import JobPhotosTab from '@/components/job-tabs/JobPhotosTab';
 import JobMoistureTab from '@/components/job-tabs/JobMoistureTab';
 import JobFloorPlanTab from '@/components/job-tabs/JobFloorPlanTab';
 import JobShareTab from '@/components/job-tabs/JobShareTab';
+import JobDocumentsTab from '@/components/job-tabs/JobDocumentsTab';
 import {
   ArrowLeft, MapPin, Phone, Mail, User, Calendar, FileText, Hash,
   Building2, Loader2, AlertCircle, CheckCircle, ChevronRight,
@@ -16,7 +17,7 @@ import {
   Zap, Radio, Globe, PhoneCall, Star, UserCheck, Navigation,
   FileCheck, X, Save, Edit3, ExternalLink, Shield, AlertTriangle,
   StopCircle, Users, ChevronDown, Sparkles, RefreshCw, NotebookPen,
-  Camera, Droplets, Map, Share2,
+  Camera, Droplets, Map, Share2, FilePen,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -221,7 +222,7 @@ export default function JobDetailPage() {
   const [notesSaved, setNotesSaved]         = useState(false);
 
   // Job Hub top-tab
-  const [activeJobTab, setActiveJobTab] = useState<'overview' | 'photos' | 'moisture' | 'floorplans' | 'share'>('overview');
+  const [activeJobTab, setActiveJobTab] = useState<'overview' | 'photos' | 'moisture' | 'floorplans' | 'share' | 'documents'>('overview');
 
   // Stop Job modal state
   const [showStopModal, setShowStopModal] = useState(false);
@@ -798,6 +799,7 @@ export default function JobDetailPage() {
             { id: 'photos',     label: 'Photos',        icon: Camera    },
             { id: 'moisture',   label: 'Moisture',      icon: Droplets  },
             { id: 'floorplans', label: 'Floor Plans',   icon: Map       },
+            { id: 'documents',  label: 'Documents',     icon: FilePen   },
             { id: 'share',      label: 'Share',         icon: Share2    },
           ] as { id: typeof activeJobTab; label: string; icon: React.ElementType }[]).map(tab => (
             <button key={tab.id} type="button"
@@ -1612,6 +1614,27 @@ export default function JobDetailPage() {
               claim_number:     job.claim_number,
               insurer_name:     job.insurer_name,
               job_type:         job.job_type,
+            }}
+          />
+        </div>
+      )}
+
+      {/* ── Documents Tab ── */}
+      {activeJobTab === 'documents' && (
+        <div className="py-2">
+          <JobDocumentsTab
+            jobId={job.id}
+            jobData={{
+              id: job.id,
+              contact_name: job.insured_name ?? null,
+              contact_phone: job.insured_phone ?? null,
+              contact_email: job.insured_email ?? null,
+              address: job.property_address ?? null,
+              claim_number: job.claim_number ?? null,
+              insurance_company: job.insurer_name ?? null,
+              adjuster_name: job.adjuster_name ?? null,
+              adjuster_phone: job.adjuster_phone ?? null,
+              date_of_loss: job.loss_date ?? null,
             }}
           />
         </div>
