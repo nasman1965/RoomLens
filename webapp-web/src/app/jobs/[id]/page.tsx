@@ -10,6 +10,7 @@ import JobMoistureTab from '@/components/job-tabs/JobMoistureTab';
 import JobFloorPlanTab from '@/components/job-tabs/JobFloorPlanTab';
 import JobShareTab from '@/components/job-tabs/JobShareTab';
 import JobDocumentsTab from '@/components/job-tabs/JobDocumentsTab';
+import JobXactimateTab from '@/components/job-tabs/JobXactimateTab';
 import {
   ArrowLeft, MapPin, Phone, Mail, User, Calendar, FileText, Hash,
   Building2, Loader2, AlertCircle, CheckCircle, ChevronRight,
@@ -17,7 +18,7 @@ import {
   Zap, Radio, Globe, PhoneCall, Star, UserCheck, Navigation,
   FileCheck, X, Save, Edit3, ExternalLink, Shield, AlertTriangle,
   StopCircle, Users, ChevronDown, Sparkles, RefreshCw, NotebookPen,
-  Camera, Droplets, Map, Share2, FilePen,
+  Camera, Droplets, Map, Share2, FilePen, Calculator,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -222,7 +223,7 @@ export default function JobDetailPage() {
   const [notesSaved, setNotesSaved]         = useState(false);
 
   // Job Hub top-tab
-  const [activeJobTab, setActiveJobTab] = useState<'overview' | 'photos' | 'moisture' | 'floorplans' | 'share' | 'documents'>('overview');
+  const [activeJobTab, setActiveJobTab] = useState<'overview' | 'photos' | 'moisture' | 'floorplans' | 'share' | 'documents' | 'xactimate'>('overview');
 
   // Stop Job modal state
   const [showStopModal, setShowStopModal] = useState(false);
@@ -800,6 +801,7 @@ export default function JobDetailPage() {
             { id: 'moisture',   label: 'Moisture',      icon: Droplets  },
             { id: 'floorplans', label: 'Floor Plans',   icon: Map       },
             { id: 'documents',  label: 'Documents',     icon: FilePen   },
+            { id: 'xactimate', label: 'Xactimate',     icon: Calculator },
             { id: 'share',      label: 'Share',         icon: Share2    },
           ] as { id: typeof activeJobTab; label: string; icon: React.ElementType }[]).map(tab => (
             <button key={tab.id} type="button"
@@ -1611,8 +1613,8 @@ export default function JobDetailPage() {
             jobData={{
               insured_name:     job.insured_name,
               property_address: job.property_address,
-              claim_number:     job.claim_number,
-              insurer_name:     job.insurer_name,
+              claim_number:     job.claim_number    ?? undefined,
+              insurer_name:     job.insurer_name    ?? undefined,
               job_type:         job.job_type,
             }}
           />
@@ -1637,6 +1639,13 @@ export default function JobDetailPage() {
               date_of_loss: job.loss_date ?? null,
             }}
           />
+        </div>
+      )}
+
+      {/* ── Xactimate Tab ── */}
+      {activeJobTab === 'xactimate' && (
+        <div className="py-2">
+          <JobXactimateTab jobId={job.id} userId={userId} />
         </div>
       )}
 
