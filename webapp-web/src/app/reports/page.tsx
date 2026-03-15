@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import {
   FileText, Plus, ChevronDown, Loader2, AlertCircle,
   CheckCircle, X, Download, Eye, Clock, FileCheck,
-  Send, Printer
+  Send, Printer, ExternalLink
 } from 'lucide-react';
 
 interface Job {
@@ -433,12 +433,22 @@ export default function ReportsPage() {
     setGenerating(false);
   };
 
-  const printReport = (content: string) => {
+  const printReport = (content: string, reportId?: string) => {
+    if (reportId) {
+      window.open(`/report/${reportId}/print`, '_blank');
+      return;
+    }
     const win = window.open('', '_blank');
     if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>RoomLensPro Report</title></head><body>${content}</body></html>`);
+    win.document.write(`<!DOCTYPE html><html><head>
+      <title>RoomLensPro Report</title>
+      <style>
+        @page { size: letter portrait; margin: 15mm 12mm; }
+        @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+        body { font-family: Arial, sans-serif; margin: 0; }
+      </style>
+    </head><body>${content}<script>setTimeout(()=>window.print(),400)<\/script></body></html>`);
     win.document.close();
-    win.print();
   };
 
   const selectedJob = jobs.find(j => j.id === selectedJobId);
@@ -563,18 +573,23 @@ export default function ReportsPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                {report.pdf_url && (
-                  <a href={report.pdf_url} target="_blank" rel="noreferrer"
-                    className="p-2 hover:bg-slate-700/50 rounded-lg transition text-slate-500 hover:text-slate-300">
-                    <Download className="w-4 h-4" />
-                  </a>
-                )}
+                {/* Download PDF — opens dedicated print page */}
+                <a
+                  href={`/report/${report.id}/print`}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Download PDF"
+                  className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition"
+                >
+                  <Download className="w-3.5 h-3.5" /> PDF
+                </a>
                 <button
                   onClick={() => {
                     const job = jobs.find(j => j.id === report.job_id);
-                    if (job) setPreviewReport({ job, type: report.report_type, content: '<p class="text-slate-500 text-sm p-8 text-center">Re-generate this report to view its content.</p>' });
+                    if (job) setPreviewReport({ job, type: report.report_type, content: '<p style="color:#6b7280;font-size:13px;padding:40px;text-align:center">Re-generate this report to preview, or click PDF to download.</p>' });
                   }}
                   className="p-2 hover:bg-slate-700/50 rounded-lg transition text-slate-500 hover:text-cyan-400"
+                  title="Preview"
                 >
                   <Eye className="w-4 h-4" />
                 </button>
