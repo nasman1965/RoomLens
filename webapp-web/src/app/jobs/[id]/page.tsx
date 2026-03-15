@@ -11,6 +11,7 @@ import JobFloorPlanTab from '@/components/job-tabs/JobFloorPlanTab';
 import JobShareTab from '@/components/job-tabs/JobShareTab';
 import JobDocumentsTab from '@/components/job-tabs/JobDocumentsTab';
 import JobXactimateTab from '@/components/job-tabs/JobXactimateTab';
+import JobThermalTab from '@/components/job-tabs/JobThermalTab';
 import {
   ArrowLeft, MapPin, Phone, Mail, User, Calendar, FileText, Hash,
   Building2, Loader2, AlertCircle, CheckCircle, ChevronRight,
@@ -18,7 +19,7 @@ import {
   Zap, Radio, Globe, PhoneCall, Star, UserCheck, Navigation,
   FileCheck, X, Save, Edit3, ExternalLink, Shield, AlertTriangle,
   StopCircle, Users, ChevronDown, Sparkles, RefreshCw, NotebookPen,
-  Camera, Droplets, Map, Share2, FilePen, Calculator,
+  Camera, Droplets, Map, Share2, FilePen, Calculator, Thermometer,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -223,7 +224,7 @@ export default function JobDetailPage() {
   const [notesSaved, setNotesSaved]         = useState(false);
 
   // Job Hub top-tab
-  const [activeJobTab, setActiveJobTab] = useState<'overview' | 'photos' | 'moisture' | 'floorplans' | 'share' | 'documents' | 'xactimate'>('overview');
+  const [activeJobTab, setActiveJobTab] = useState<'overview' | 'photos' | 'moisture' | 'floorplans' | 'share' | 'documents' | 'xactimate' | 'thermal'>('overview');
 
   // Stop Job modal state
   const [showStopModal, setShowStopModal] = useState(false);
@@ -801,8 +802,9 @@ export default function JobDetailPage() {
             { id: 'moisture',   label: 'Moisture',      icon: Droplets  },
             { id: 'floorplans', label: 'Floor Plans',   icon: Map       },
             { id: 'documents',  label: 'Documents',     icon: FilePen   },
-            { id: 'xactimate', label: 'Xactimate',     icon: Calculator },
-            { id: 'share',      label: 'Share',         icon: Share2    },
+            { id: 'xactimate', label: 'Xactimate',     icon: Calculator  },
+            { id: 'thermal',    label: 'Thermal',       icon: Thermometer },
+            { id: 'share',      label: 'Share',         icon: Share2      },
           ] as { id: typeof activeJobTab; label: string; icon: React.ElementType }[]).map(tab => (
             <button key={tab.id} type="button"
               onClick={() => setActiveJobTab(tab.id)}
@@ -1646,6 +1648,13 @@ export default function JobDetailPage() {
       {activeJobTab === 'xactimate' && (
         <div className="py-2">
           <JobXactimateTab jobId={job.id} userId={userId} />
+        </div>
+      )}
+
+      {/* ── Thermal Tab ── */}
+      {activeJobTab === 'thermal' && (
+        <div className="py-2">
+          <JobThermalTab jobId={job.id} userId={userId} />
         </div>
       )}
 

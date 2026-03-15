@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// ─── Supabase admin client ─────────────────────────────────────────────────────
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+export const dynamic = 'force-dynamic';
 
 const SYSTEM_PROMPT = `You are a restoration technician's assistant. Take the tech's rough field notes and rewrite them as 2-3 clear professional paragraphs. Plain English only. No bullet points, no headings, no tables. Just clean readable general notes about what was observed at the property.`;
 
@@ -72,6 +68,10 @@ export async function POST(req: NextRequest) {
 
     // ── Optionally save to Supabase ────────────────────────────────────────────
     if (save && job_id) {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
       const { error: dbErr } = await supabase
         .from('jobs')
         .update({ notes: generated, updated_at: new Date().toISOString() })
