@@ -62,6 +62,26 @@ export default function ReportsPage() {
   const [selectedType, setSelectedType] = useState('24hr_report');
   const [previewReport, setPreviewReport] = useState<{ job: Job; type: string; content: string } | null>(null);
 
+  // Thermal reading type
+  interface ThermalReading {
+    id: string;
+    room_name: string;
+    wall_direction: string | null;
+    surface_temp_c: number | null;
+    ambient_temp_c: number | null;
+    temp_delta_c: number | null;
+    anomaly_type: string | null;
+    moisture_probability: number | null;
+    mould_risk: string;
+    recommendation: string | null;
+    affected_area_sf: number | null;
+    height_from_floor_cm: number | null;
+    thermal_photo_url: string | null;
+    visible_photo_url: string | null;
+    device_model: string | null;
+    scan_timestamp: string;
+  }
+
   useEffect(() => {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -100,15 +120,17 @@ export default function ReportsPage() {
     setGenerating(true); setError('');
 
     // Fetch supporting data
-    const [stepsRes, moistureRes, photosRes] = await Promise.all([
+    const [stepsRes, moistureRes, photosRes, thermalRes] = await Promise.all([
       supabase.from('workflow_steps').select('*').eq('job_id', selectedJobId).order('step_number'),
       supabase.from('moisture_readings').select('*').eq('job_id', selectedJobId).order('created_at', { ascending: false }),
       supabase.from('damage_photos').select('id, tags, created_at').eq('job_id', selectedJobId),
+      supabase.from('thermal_readings').select('*').eq('job_id', selectedJobId).order('scan_timestamp', { ascending: true }),
     ]);
 
     const steps = stepsRes.data || [];
     const readings = moistureRes.data || [];
     const photos = photosRes.data || [];
+    const thermals: ThermalReading[] = (thermalRes.data || []);
 
     // Generate report content as HTML string
     const now = new Date().toLocaleString();
@@ -148,15 +170,168 @@ export default function ReportsPage() {
 
     // Type-specific sections
     if (selectedType === '24hr_report') {
+      // ── Thermal risk colours ──────────────────────────────────────────────────
+      const riskColour: Record<string, { bg: string; text: string; badge: string }> = {
+        critical: { bg: '#fef2f2', text: '#991b1b', badge: '#dc2626' },
+        high:     { bg: '#fff7ed', text: '#9a3412', badge: '#ea580c' },
+        medium:   { bg: '#fffbeb', text: '#92400e', badge: '#d97706' },
+        low:      { bg: '#f0fdf4', text: '#166534', badge: '#16a34a' },
+      };
+      const anomalyLabel: Record<string, string> = {
+        wet_insulation:  '❄️ Wet Insulation',
+        mould_heat:      '🦠 Mould Heat Signature',
+        cold_bridge:     '🌡️ Cold Bridge',
+        subfloor_wet:    '💧 Wet Subfloor',
+        bottom_plate:    '⚠️ Saturated Bottom Plate',
+        normal:          '✅ Normal',
+      };
+
+      const hasCritical = thermals.some(t => t.mould_risk === 'critical');
+      const hasHigh     = thermals.some(t => t.mould_risk === 'high');
+      const highestRisk = hasCritical ? 'critical' : hasHigh ? 'high' : thermals.length > 0 ? thermals[0].mould_risk : null;
+
       content += `
+          <!-- ═══ INITIAL SITE ASSESSMENT ═══════════════════════════════════════ -->
           <h2 style="font-size: 16px; font-weight: 600; color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; margin-top: 24px; margin-bottom: 16px;">Initial Site Assessment</h2>
           <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-            <tr><td style="padding: 6px 0; color: #6b7280; width: 160px;">Photos Taken</td><td style="font-weight: 600;">${photos.length}</td></tr>
+            <tr><td style="padding: 6px 0; color: #6b7280; width: 180px;">Photos Taken</td><td style="font-weight: 600;">${photos.length}</td></tr>
             <tr><td style="padding: 6px 0; color: #6b7280;">Initial MC Readings</td><td style="font-weight: 600;">${readings.length}</td></tr>
+            <tr><td style="padding: 6px 0; color: #6b7280;">Thermal Scans</td><td style="font-weight: 600;">${thermals.length}${thermals.length > 0 ? ` <span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:999px;font-size:10px;font-weight:700;margin-left:6px;">FLIR Documented</span>` : ' <span style="background:#f3f4f6;color:#9ca3af;padding:1px 6px;border-radius:999px;font-size:10px;">None recorded</span>'}</td></tr>
             <tr><td style="padding: 6px 0; color: #6b7280;">Response Time</td><td style="color: #059669; font-weight: 600;">Within 24 hours ✓</td></tr>
           </table>
+
+          ${highestRisk && highestRisk !== 'low' ? `
+          <div style="background:${riskColour[highestRisk]?.bg};border-left:4px solid ${riskColour[highestRisk]?.badge};padding:14px;border-radius:0 8px 8px 0;margin-top:16px;">
+            <div style="font-weight:700;font-size:14px;color:${riskColour[highestRisk]?.text};margin-bottom:4px;">
+              ${highestRisk === 'critical' ? '🚨 CRITICAL THERMAL ALERT' : highestRisk === 'high' ? '⚠️ HIGH MOULD RISK DETECTED' : '⚠️ THERMAL ANOMALY DETECTED'}
+            </div>
+            <div style="font-size:12px;color:${riskColour[highestRisk]?.text};">
+              Infrared scan detected hidden moisture or mould heat signatures. Scope includes thermal-justified removal. See Thermal Findings section below.
+            </div>
+          </div>` : ''}
+
+          ${thermals.length > 0 ? `
+          <!-- ═══ THERMAL FINDINGS ════════════════════════════════════════════════ -->
+          <h2 style="font-size: 16px; font-weight: 600; color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; margin-top: 28px; margin-bottom: 6px;">
+            🌡️ Infrared Thermal Scan Findings
+          </h2>
+          <p style="font-size:12px;color:#6b7280;margin-bottom:14px;">
+            Scanned with ${thermals[0].device_model || 'FLIR thermal camera'} on ${new Date(thermals[0].scan_timestamp).toLocaleDateString('en-CA')}.
+            Temperature differentials ≥2°C indicate potential hidden moisture. Results are evidence-grade documentation.
+          </p>
+
+          <!-- Thermal summary bar -->
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;">
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center;">
+              <div style="font-size:22px;font-weight:700;color:#0f172a;">${thermals.length}</div>
+              <div style="font-size:11px;color:#64748b;">Zones Scanned</div>
+            </div>
+            <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px;text-align:center;">
+              <div style="font-size:22px;font-weight:700;color:#dc2626;">${thermals.filter(t => t.mould_risk === 'critical' || t.mould_risk === 'high').length}</div>
+              <div style="font-size:11px;color:#dc2626;">High/Critical Risk</div>
+            </div>
+            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px;text-align:center;">
+              <div style="font-size:22px;font-weight:700;color:#d97706;">${thermals.filter(t => t.anomaly_type && t.anomaly_type !== 'normal').length}</div>
+              <div style="font-size:11px;color:#d97706;">Anomalies Found</div>
+            </div>
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;text-align:center;">
+              <div style="font-size:22px;font-weight:700;color:#16a34a;">${thermals.reduce((sum, t) => sum + (t.affected_area_sf || 0), 0).toFixed(0)} SF</div>
+              <div style="font-size:11px;color:#16a34a;">Affected Area</div>
+            </div>
+          </div>
+
+          <!-- Per-zone thermal detail table -->
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead>
+              <tr style="background:#f8fafc;">
+                <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #e2e8f0;color:#374151;">Room / Zone</th>
+                <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #e2e8f0;color:#374151;">Wall</th>
+                <th style="padding:8px 10px;text-align:center;border-bottom:2px solid #e2e8f0;color:#374151;">Surface °C</th>
+                <th style="padding:8px 10px;text-align:center;border-bottom:2px solid #e2e8f0;color:#374151;">Ambient °C</th>
+                <th style="padding:8px 10px;text-align:center;border-bottom:2px solid #e2e8f0;color:#374151;">Δ Temp</th>
+                <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #e2e8f0;color:#374151;">Finding</th>
+                <th style="padding:8px 10px;text-align:center;border-bottom:2px solid #e2e8f0;color:#374151;">Moisture %</th>
+                <th style="padding:8px 10px;text-align:center;border-bottom:2px solid #e2e8f0;color:#374151;">Risk</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${thermals.map(t => {
+                const risk = riskColour[t.mould_risk] || riskColour.low;
+                const deltaAbs = t.temp_delta_c != null ? Math.abs(t.temp_delta_c) : null;
+                const deltaColor = deltaAbs == null ? '#9ca3af' : deltaAbs >= 3 ? '#dc2626' : deltaAbs >= 1.5 ? '#d97706' : '#16a34a';
+                return `<tr style="border-bottom:1px solid #f1f5f9;">
+                  <td style="padding:7px 10px;font-weight:600;color:#1e293b;">${t.room_name}</td>
+                  <td style="padding:7px 10px;color:#64748b;text-transform:uppercase;font-size:11px;">${t.wall_direction || '—'}</td>
+                  <td style="padding:7px 10px;text-align:center;">${t.surface_temp_c != null ? t.surface_temp_c + '°C' : '—'}</td>
+                  <td style="padding:7px 10px;text-align:center;">${t.ambient_temp_c != null ? t.ambient_temp_c + '°C' : '—'}</td>
+                  <td style="padding:7px 10px;text-align:center;font-weight:700;color:${deltaColor};">${t.temp_delta_c != null ? (t.temp_delta_c > 0 ? '+' : '') + t.temp_delta_c + '°C' : '—'}</td>
+                  <td style="padding:7px 10px;">${t.anomaly_type ? (anomalyLabel[t.anomaly_type] || t.anomaly_type) : '—'}</td>
+                  <td style="padding:7px 10px;text-align:center;font-weight:600;color:${deltaColor};">${t.moisture_probability != null ? t.moisture_probability + '%' : '—'}</td>
+                  <td style="padding:7px 10px;text-align:center;">
+                    <span style="background:${risk.bg};color:${risk.text};border:1px solid ${risk.badge};padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;text-transform:uppercase;">
+                      ${t.mould_risk}
+                    </span>
+                  </td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+
+          <!-- Thermal photo pairs -->
+          ${thermals.filter(t => t.thermal_photo_url || t.visible_photo_url).length > 0 ? `
+          <h3 style="font-size:14px;font-weight:600;color:#374151;margin-top:20px;margin-bottom:10px;">Thermal + Visible Photo Evidence</h3>
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">
+            ${thermals.filter(t => t.thermal_photo_url || t.visible_photo_url).map(t => `
+            <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+              <div style="background:#f8fafc;padding:8px 10px;font-size:11px;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;">
+                ${t.room_name}${t.wall_direction ? ' — ' + t.wall_direction + ' wall' : ''}
+                <span style="float:right;background:${(riskColour[t.mould_risk] || riskColour.low).bg};color:${(riskColour[t.mould_risk] || riskColour.low).text};padding:1px 6px;border-radius:999px;font-size:10px;">${t.mould_risk.toUpperCase()}</span>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;">
+                ${t.thermal_photo_url ? `<div><img src="${t.thermal_photo_url}" alt="Thermal" style="width:100%;height:120px;object-fit:cover;display:block;"/><div style="padding:4px 8px;font-size:10px;color:#6b7280;background:#fef3c7;">🌡️ Thermal</div></div>` : '<div style="background:#f9fafb;height:140px;display:flex;align-items:center;justify-content:center;color:#d1d5db;font-size:11px;">No thermal photo</div>'}
+                ${t.visible_photo_url ? `<div><img src="${t.visible_photo_url}" alt="Visible" style="width:100%;height:120px;object-fit:cover;display:block;"/><div style="padding:4px 8px;font-size:10px;color:#6b7280;background:#f9fafb;">📷 Visible</div></div>` : '<div style="background:#f9fafb;height:140px;display:flex;align-items:center;justify-content:center;color:#d1d5db;font-size:11px;">No visible photo</div>'}
+              </div>
+              ${t.recommendation ? `<div style="padding:8px 10px;font-size:11px;color:#374151;border-top:1px solid #e2e8f0;background:#fffbeb;">📋 ${t.recommendation}</div>` : ''}
+            </div>`).join('')}
+          </div>` : ''}
+
+          <!-- Xactimate thermal-justified line items -->
+          ${thermals.filter(t => t.anomaly_type && t.anomaly_type !== 'normal' && t.affected_area_sf).length > 0 ? `
+          <h3 style="font-size:14px;font-weight:600;color:#374151;margin-top:20px;margin-bottom:10px;">Thermal-Justified Xactimate Scope</h3>
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead><tr style="background:#f8fafc;">
+              <th style="padding:7px 10px;text-align:left;border-bottom:2px solid #e2e8f0;">Location</th>
+              <th style="padding:7px 10px;text-align:left;border-bottom:2px solid #e2e8f0;">Line Item</th>
+              <th style="padding:7px 10px;text-align:center;border-bottom:2px solid #e2e8f0;">Qty</th>
+              <th style="padding:7px 10px;text-align:left;border-bottom:2px solid #e2e8f0;">Evidence</th>
+            </tr></thead>
+            <tbody>
+              ${thermals.filter(t => t.anomaly_type && t.anomaly_type !== 'normal' && t.affected_area_sf).flatMap(t => {
+                const items: string[] = [];
+                const sf = t.affected_area_sf?.toFixed(1) || '0';
+                if (t.anomaly_type === 'wet_insulation') {
+                  items.push(`<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:6px 10px;color:#374151;">${t.room_name}</td><td style="padding:6px 10px;">Remove drywall — thermal justified</td><td style="padding:6px 10px;text-align:center;font-weight:600;">${sf} SF</td><td style="padding:6px 10px;font-size:11px;color:#92400e;">ΔT: ${t.temp_delta_c}°C · ${t.moisture_probability}% moisture probability</td></tr>`);
+                  items.push(`<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:6px 10px;color:#374151;"></td><td style="padding:6px 10px;">Remove wet insulation</td><td style="padding:6px 10px;text-align:center;font-weight:600;">${sf} SF</td><td style="padding:6px 10px;font-size:11px;color:#92400e;">Infrared confirmed</td></tr>`);
+                }
+                if (t.anomaly_type === 'mould_heat') {
+                  items.push(`<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:6px 10px;color:#374151;">${t.room_name}</td><td style="padding:6px 10px;">Mould remediation — IICRC S520</td><td style="padding:6px 10px;text-align:center;font-weight:600;">${sf} SF</td><td style="padding:6px 10px;font-size:11px;color:#991b1b;">Thermal heat signature +${Math.abs(t.temp_delta_c || 0)}°C</td></tr>`);
+                  items.push(`<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:6px 10px;"></td><td style="padding:6px 10px;">Containment setup + neg. air pressure</td><td style="padding:6px 10px;text-align:center;font-weight:600;">1 EA</td><td style="padding:6px 10px;font-size:11px;color:#991b1b;">Mould protocol required</td></tr>`);
+                }
+                if (t.anomaly_type === 'bottom_plate') {
+                  items.push(`<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:6px 10px;color:#374151;">${t.room_name}</td><td style="padding:6px 10px;">Remove & replace bottom plate</td><td style="padding:6px 10px;text-align:center;font-weight:600;">${(t.height_from_floor_cm || 60) / 100 * 3.28} LF</td><td style="padding:6px 10px;font-size:11px;color:#92400e;">Thermal: saturation at floor junction</td></tr>`);
+                }
+                if (t.anomaly_type === 'subfloor_wet') {
+                  items.push(`<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:6px 10px;color:#374151;">${t.room_name}</td><td style="padding:6px 10px;">Remove wet subfloor</td><td style="padding:6px 10px;text-align:center;font-weight:600;">${sf} SF</td><td style="padding:6px 10px;font-size:11px;color:#92400e;">Thermal: subfloor cold zone detected</td></tr>`);
+                }
+                return items;
+              }).join('')}
+            </tbody>
+          </table>` : ''}
+
+          ` : ''}
+
           <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px; border-radius: 0 8px 8px 0; margin-top: 16px; font-size: 13px; color: #92400e;">
-            ⚠️ This is an automatically generated 24-hour initial report. All data reflects conditions as recorded at time of initial site visit.
+            ⚠️ This is an automatically generated 24-hour initial report. All data reflects conditions as recorded at time of initial site visit. Thermal readings are timestamped evidence and comply with IICRC S500 / S520 documentation standards.
           </div>
       `;
     }

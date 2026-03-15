@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 // Body: { type, ...context }
 //
 // Supported types:
-//   job_notes       – rough field notes → professional paragraphs
+//   job_notes         – rough field notes → professional paragraphs
 //   insurance_summary – job data → formatted insurance adjuster summary
 //   dispatch_message  – job + staff data → SMS dispatch text
 //   damage_description – photo URL → damage description for report
@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 //   job_report        – full job data → complete job completion report
 //   incident_note     – staff + incident → formal HR incident note
 //   daily_summary     – jobs array → end-of-day summary
+//   thermal_scan      – FLIR thermal photo → hidden moisture/mould JSON analysis
 
 async function callOpenAI(systemPrompt: string, userPrompt: string, maxTokens = 600): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -270,6 +271,47 @@ ACTIVE JOBS:
 ${jobSummary}`;
 
       result = await callOpenAI(system, user, 500);
+    }
+
+    // ── 9. THERMAL SCAN INTERPRETATION (Vision) ─────────────────────────────────
+    else if (type === 'thermal_scan') {
+      const { thermal_photo_url, visible_photo_url, room_name, ambient_temp_c, job_context } = body;
+      if (!thermal_photo_url) return NextResponse.json({ error: 'thermal_photo_url required' }, { status: 400 });
+
+      const system = `You are a certified IICRC water damage and mould remediation inspector with expertise in infrared thermography.
+Analyze the thermal image to detect hidden moisture, mould heat signatures, wet insulation, saturated bottom plates, or wet subfloors.
+Return a JSON object ONLY with these exact fields:
+{
+  "anomaly_type": "wet_insulation" | "mould_heat" | "cold_bridge" | "subfloor_wet" | "bottom_plate" | "normal",
+  "moisture_probability": 0-100,
+  "mould_risk": "low" | "medium" | "high" | "critical",
+  "surface_temp_c": number or null,
+  "temp_delta_c": number or null,
+  "affected_area_sf": number or null,
+  "height_from_floor_cm": number or null,
+  "anomaly_height_cm": number or null,
+  "recommendation": "one sentence action recommendation",
+  "confidence_notes": "brief explanation of findings"
+}
+Only return valid JSON. No markdown, no explanation text outside the JSON.`;
+
+      const user = `Analyze this thermal infrared image for hidden moisture and damage.
+Room/Area: ${room_name || 'Unknown'}
+Ambient temperature: ${ambient_temp_c != null ? ambient_temp_c + '°C' : 'Unknown'}
+Loss type: ${job_context?.job_type || 'water damage'}
+${visible_photo_url ? 'A matching visible-light photo is also provided for reference.' : ''}
+Identify any temperature anomalies, cold spots (wet insulation), warm spots (mould), or moisture patterns.`;
+
+      // Use vision with thermal image (+ visible if provided)
+      const result_raw = await callOpenAIVision(system, user, thermal_photo_url, 500);
+
+      // Try to parse JSON from AI response
+      try {
+        const parsed = JSON.parse(result_raw.replace(/```json|```/g, '').trim());
+        return NextResponse.json({ result: result_raw, parsed, type });
+      } catch {
+        return NextResponse.json({ result: result_raw, type });
+      }
     }
 
     else {
